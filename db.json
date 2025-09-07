@@ -1,0 +1,215 @@
+{
+  "employees": [
+    {
+      "id": "1",
+      "name": "John Do",
+      "email": "john.doe@company.com",
+      "role": "employee",
+      "position": "Senior Developer",
+      "department": "HR",
+      "joinDate": "2025-09-06",
+      "status": "Active",
+      "password": "john123"
+    },
+    {
+      "id": "3",
+      "name": "Mike Johnson",
+      "email": "mike.johnson@company.com",
+      "position": "Sales Representative",
+      "role": "employee",
+      "department": "Engineering",
+      "joinDate": "2025-09-06",
+      "status": "Active",
+      "password": "john123"
+    },
+    {
+      "id": "4",
+      "name": "Sarah Wilson",
+      "email": "sarah.wilson@company.com",
+      "position": "Marketing Specialist",
+      "role": "employee",
+      "department": "Engineering",
+      "joinDate": "2025-09-06",
+      "status": "Active",
+      "password": "john123"
+    },
+    {
+      "id": "5",
+      "name": "David Brown",
+      "email": "david.brown@company.com",
+      "position": "Accountant",
+      "role": "employee",
+      "department": "Finance",
+      "joinDate": "2023-06-18",
+      "status": "Active",
+      "password": "john123"
+    },
+    {
+      "id": "6",
+      "name": "Emily Davis",
+      "email": "emily.davis@company.com",
+      "position": "HR Coordinator",
+      "role": "employee",
+      "department": "development",
+      "joinDate": "2025-09-06",
+      "status": "Active",
+      "password": "john123"
+    },
+    {
+      "id": "8fcf",
+      "name": "sss",
+      "email": "employee@company.com",
+      "password": "123456",
+      "confirmPassword": "123456",
+      "role": "Employee",
+      "position": "intern(data)",
+      "department": "Engineering",
+      "status": "Active",
+      "joinDate": "2025-09-06"
+    },
+    {
+      "id": "7fa3",
+      "name": "aaa",
+      "email": "aaa@gmail.com",
+      "password": "aaa@123",
+      "confirmPassword": "aaa@123",
+      "role": "employee",
+      "position": "intern",
+      "department": "Sales",
+      "status": "Active",
+      "joinDate": "2025-09-06"
+    }
+  ],
+  "admins": [
+    {
+      "id": "4d0d",
+      "name": "ram",
+      "email": "admin@company.com",
+      "password": "123456",
+      "confirmPassword": "123456",
+      "role": "admin",
+      "position": "Product Manager",
+      "department": "Product",
+      "status": "Active",
+      "joinDate": "2025-09-06"
+    },
+    {
+      "id": "4dc7",
+      "name": "Sarah Wilson",
+      "email": "sss@gmail.com",
+      "password": "sss1234",
+      "confirmPassword": "sss1234",
+      "role": "admin",
+      "position": "Marketing Specialist ",
+      "department": "Marketing",
+      "status": "Active",
+      "joinDate": "2025-09-06"
+    },
+    {
+      "id": "9693",
+      "name": "ganesh",
+      "email": "ggg@gmail.com",
+      "password": "ggg1234",
+      "confirmPassword": "ggg1234",
+      "role": "admin",
+      "position": "develop manager",
+      "department": "Engineering",
+      "status": "Active",
+      "joinDate": "2025-09-06"
+    }
+  ],
+  "departments": [
+    {
+      "id": "1",
+      "name": "Engineering",
+      "description": "Software development and technical operations",
+      "manager": "John Doe",
+      "status": "Active"
+    },
+    {
+      "id": "2",
+      "name": "Product",
+      "description": "Product management and strategy",
+      "manager": "Jane Smith",
+      "status": "Active"
+    },
+    {
+      "id": "3",
+      "name": "Sales",
+      "description": "Customer acquisition and relationship management",
+      "manager": "Mike Johnson",
+      "status": "Active"
+    },
+    {
+      "id": "4",
+      "name": "Marketing",
+      "description": "Brand promotion and marketing campaigns",
+      "manager": "Sarah Wilson",
+      "status": "Active"
+    },
+    {
+      "id": "5",
+      "name": "HR",
+      "description": "Human resources and talent management",
+      "manager": "Lisa Brown",
+      "status": "Active"
+    },
+    {
+      "id": "46a2",
+      "name": "development",
+      "description": "development production",
+      "manager": "Sarah Wilson",
+      "status": "Inactive"
+    }
+  ],
+  "attendance": [
+    {
+      "id": "b018",
+      "employee_id": "2",
+      "date": "2025-09-06",
+      "time_in": "3:36:32 PM",
+      "time_out": "3:38:18 PM",
+      "workinghours": 0,
+      "workingminutes": 1
+    },
+    {
+      "id": "24d4",
+      "employee_id": "2",
+      "date": "2025-09-06",
+      "time_in": "3:41:50 PM",
+      "time_out": "",
+      "workinghours": 0
+    },
+    {
+      "id": "d611",
+      "employee_id": "2",
+      "date": "2025-09-06",
+      "time_in": "4:05:58 PM",
+      "time_out": "4:06:04 PM",
+      "workinghours": 0,
+      "workingminutes": 0
+    },
+    {
+      "id": "0b73",
+      "employee_id": "2",
+      "date": "2025-09-07",
+      "time_in": "10:27:50 AM",
+      "time_out": "",
+      "workinghours": 0
+    }
+  ],
+  "leaves": [
+    {
+      "id": "638c",
+      "employeeId": "2",
+      "employeeName": "Siddhesh",
+      "type": "Personal",
+      "startDate": "2025-09-16",
+      "endDate": "2025-09-24",
+      "days": 9,
+      "reason": "personal",
+      "status": "Pending",
+      "submittedAt": "2025-09-06T10:34:50.468Z"
+    }
+  ]
+}
