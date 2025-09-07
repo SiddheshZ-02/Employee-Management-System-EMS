@@ -16,6 +16,7 @@ import { EmployeeDashboard } from "@/pages/employee/EmployeeDashboard";
 import AttendanceTracking from "@/pages/employee/AttendanceTracking";
 import LeaveManagement from "@/pages/employee/LeaveManagement";
 import { ProfileManagement } from "@/pages/employee/ProfileManagement";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ const App = () => (
               <Route path="leave" element={<LeaveManagement />} />
               <Route path="profile" element={<ProfileManagement />} />
             </Route>
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>

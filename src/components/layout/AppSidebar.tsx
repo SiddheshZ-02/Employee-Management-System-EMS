@@ -1,4 +1,4 @@
-import { NavLink, } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import {
   Calendar, 
   User,
   LogOut,
- 
+
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -85,7 +85,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
 
   const navItems = user?.role === 'Admin' ? adminNavItems : employeeNavItems;
-  // const isActive = (path: string) => currentPath === path;
+  // const isActived = (path: string) => currentPath === path;
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`;
 
