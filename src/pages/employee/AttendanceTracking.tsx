@@ -138,9 +138,9 @@ const AttendanceTracking = () => {
     fetchAttendance();
   }, [todayRecord]);
 
-  const userRecords = attendance
-    .filter((record) => record.employee_id === user?.id)
-    .slice(0, 7);
+  // const userRecords = attendance
+  //   .filter((record) => record.employee_id === user?.id)
+  //   .slice(0, 7);
 
   return (
     <div className="space-y-6 animate-fade-in">

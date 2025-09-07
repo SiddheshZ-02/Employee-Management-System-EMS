@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, } from 'react-router-dom';
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +21,7 @@ import {
   Calendar, 
   User,
   LogOut,
-  Shield
+ 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
@@ -78,14 +78,14 @@ const employeeNavItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  const location = useLocation();
-  const currentPath = location.pathname;
+  // const location = useLocation();
+  // const currentPath = location.pathname;
   const { user } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
 
   const navItems = user?.role === 'Admin' ? adminNavItems : employeeNavItems;
-  const isActive = (path: string) => currentPath === path;
+  // const isActive = (path: string) => currentPath === path;
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`;
 

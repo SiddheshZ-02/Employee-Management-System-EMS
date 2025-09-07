@@ -40,7 +40,6 @@ import {
   addAdmin,
   updateAdmin,
   deleteAdmin,
-  setAdmins,
   type Admins,
 } from "@/store/slices/adminSlice";
 import {

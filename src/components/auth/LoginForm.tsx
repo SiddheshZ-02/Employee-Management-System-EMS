@@ -11,11 +11,11 @@ import { store } from '@/store';
 import { toast } from '@/hooks/use-toast';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
-interface LoginFormProps {
-  onToggleMode: () => void;
-}
+// interface LoginFormProps {
+//   onToggleMode: () => void;
+// }
 
-export const LoginForm = ({ onToggleMode }: LoginFormProps) => {
+export const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);

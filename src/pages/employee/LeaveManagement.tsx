@@ -1,9 +1,6 @@
 import { useState, useEffect } from "react";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import {
-  submitLeaveRequest,
-  type LeaveRequest,
-} from "@/store/slices/leaveSlice";
+import { type LeaveRequest } from "@/store/slices/leaveSlice";
 import {
   Card,
   CardContent,
@@ -60,9 +57,7 @@ interface LeaveFormData {
 
 const LeaveManagement = () => {
   const { user } = useAppSelector((state) => state.auth);
-  const { requests: leaveRequests, balances } = useAppSelector(
-    (state) => state.leave
-  );
+  const { balances } = useAppSelector((state) => state.leave);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [leave, setLeave] = useState<LeaveRequest[]>([]);
