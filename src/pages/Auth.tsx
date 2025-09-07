@@ -39,7 +39,7 @@ export const Auth = () => {
     }}>
       <div className="w-full max-w-md">
         {isLogin ? (
-          <LoginForm onToggleMode={toggleMode} />
+          <LoginForm/>
         ) : (
           <SignupForm onToggleMode={toggleMode} />
         )}
