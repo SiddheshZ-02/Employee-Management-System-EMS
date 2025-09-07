@@ -1,15 +1,10 @@
 import { Provider } from "react-redux";
 import { store } from "@/store";
-// import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner, Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-} from "react-router-dom";
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+
 import { Auth } from "@/pages/Auth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ProtectedRoute } from "@/components/layout/ProtectedRoute";
@@ -31,7 +26,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <HashRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<Navigate to="/auth" replace />} />
@@ -65,9 +60,11 @@ const App = () => (
               <Route path="leave" element={<LeaveManagement />} />
               <Route path="profile" element={<ProfileManagement />} />
             </Route>
+
+            {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </BrowserRouter>
+        </HashRouter>
       </TooltipProvider>
     </QueryClientProvider>
   </Provider>
