@@ -11,7 +11,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "/Employee_Management_System-EMS/",
+  base: "/Employee-Management-System-EMS/",
   build: {
     rollupOptions: {
       output: {
