@@ -18,6 +18,10 @@ import LeaveManagement from "@/pages/employee/LeaveManagement";
 import { ProfileManagement } from "@/pages/employee/ProfileManagement";
 import NotFound from "@/pages/NotFound";
 
+
+
+
+
 const queryClient = new QueryClient();
 
 const App = () => (

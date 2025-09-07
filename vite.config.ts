@@ -11,5 +11,23 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "/Employee-Management-System-EMS-/"
+  base: "/Employee-Management-System-EMS-/",
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ["react", "react-dom"],
+          vendor: [
+            "redux",
+            "react-redux",
+            "@tanstack/react-query",
+            "lucide-react"
+          ],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
+  }
 });
+
+
