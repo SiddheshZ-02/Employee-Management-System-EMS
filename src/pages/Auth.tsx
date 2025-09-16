@@ -25,19 +25,8 @@ export const Auth = () => {
   };
 
   return (
-    <div style={{
-     height: '100%',
-      width: '100%',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: '#fff',
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      zIndex: 1
-    }}>
-      <div className="w-full max-w-md">
+    <div className="min-h-screen w-full flex items-center justify-center p-3 sm:p-4 md:p-6 bg-background">
+      <div className="w-full max-w-sm sm:max-w-md">
         {isLogin ? (
           <LoginForm/>
         ) : (

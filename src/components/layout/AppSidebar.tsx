@@ -100,21 +100,16 @@ export function AppSidebar() {
 
   return (
     <Sidebar className={`bg-gradient-sidebar border-sidebar-border ${collapsed ? 'w-14' : 'w-64'}`}>
-      <SidebarHeader className="border-b border-sidebar-border p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10  items-center justify-center rounded-lg bg-sidebar-primary">
-            {/* <Shield className="h-4 w-4 text-sidebar-primary-foreground" /> */}
-           <h6 className='text-sidebar-primary-foreground px-20 text-lg'>EMS</h6>
+      <SidebarHeader className="border-b border-sidebar-border p-3 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-sidebar-primary flex-shrink-0">
+            <h6 className='text-sidebar-primary-foreground text-sm sm:text-lg font-bold'>EMS</h6>
           </div>
           {!collapsed && (
-            <div className="flex flex-col">
-             
-              <span className="text-sm font-semibold text-sidebar-foreground">
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs sm:text-sm font-semibold text-sidebar-foreground truncate">
                 Employee Management System
               </span>
-              {/* <span className="text-xs text-sidebar-foreground/70">
-                {user?.role} Panel
-              </span> */}
             </div>
           )}
         </div>
@@ -143,16 +138,16 @@ export function AppSidebar() {
       </SidebarContent>
 
       {/* User Profile & Logout */}
-      <div className="mt-auto border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3 mb-3">
-          <Avatar className="h-8 w-8">
+      <div className="mt-auto border-t border-sidebar-border p-3 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
+          <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0">
             <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
               {user?.name ? getUserInitials(user.name) : 'U'}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
-            <div className="flex-1 truncate">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs sm:text-sm font-medium text-sidebar-foreground truncate">
                 {user?.name}
               </p>
               <p className="text-xs text-sidebar-foreground/70 truncate">
@@ -166,12 +161,12 @@ export function AppSidebar() {
           variant="default"
           size="sm"
           onClick={handleLogout}
-          className={`bg-grey-900  hover:bg-red-500 focus-visible:ring ring-gray-300 text-black shadow-md hover:shadow-glow transition-smooth ${
-            collapsed ? 'px-2' : ''
+          className={`bg-grey-900 hover:bg-red-500 focus-visible:ring ring-gray-300 text-black shadow-md hover:shadow-glow transition-smooth w-full text-xs sm:text-sm ${
+            collapsed ? 'px-1 sm:px-2' : ''
           }`}
         >
-          <LogOut className="h-4 w-4 flex-shrink-0" />
-          {!collapsed && <span className="ml-2">Logout</span>}
+          <LogOut className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+          {!collapsed && <span className="ml-1 sm:ml-2 truncate">Logout</span>}
         </Button>
       </div>
     </Sidebar>

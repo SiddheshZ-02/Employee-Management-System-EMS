@@ -114,138 +114,142 @@ export const SignupForm = ({ onToggleMode }: SignupFormProps) => {
   };
 
   return (
-    <Card className="w-full max-w-md shadow-lg border-card-border">
-      <CardHeader className="space-y-1 text-center">
-        <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-        <CardDescription>
+    <Card className="w-full shadow-lg border-card-border">
+      <CardHeader className="space-y-2 sm:space-y-1 text-center px-4 sm:px-6 pt-4 sm:pt-6">
+        <CardTitle className="text-xl sm:text-2xl font-bold">Create Account</CardTitle>
+        <CardDescription className="text-sm sm:text-base">
           Join our platform and get started today
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Full Name</Label>
+            <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
             <Input
               id="name"
               placeholder="Enter your full name"
               value={formData.name}
               onChange={(e) => handleInputChange('name', e.target.value)}
-              className={getFieldError('name') ? 'border-destructive' : ''}
+              className={`h-9 sm:h-10 ${getFieldError('name') ? 'border-destructive' : ''}`}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
             <Input
               id="email"
               type="email"
               placeholder="Enter your email"
               value={formData.email}
               onChange={(e) => handleInputChange('email', e.target.value)}
-              className={getFieldError('email') ? 'border-destructive' : ''}
+              className={`h-9 sm:h-10 ${getFieldError('email') ? 'border-destructive' : ''}`}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select
-              value={formData.role}
-              onValueChange={(value) => handleInputChange('role', value)}
-            >
-              <SelectTrigger className={getFieldError('role') ? 'border-destructive' : ''}>
-                <SelectValue placeholder="Select your role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Admin">Admin</SelectItem>
-                <SelectItem value="Employee">Employee</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="department">Department</Label>
-            <Select
-              value={formData.department}
-              onValueChange={(value) => handleInputChange('department', value)}
-            >
-              <SelectTrigger className={getFieldError('department') ? 'border-destructive' : ''}>
-                <SelectValue placeholder="Select your department" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments.map(dept => (
-                  <SelectItem key={dept} value={dept}>{dept}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Create a password"
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                className={getFieldError('password') ? 'border-destructive' : ''}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="role" className="text-sm font-medium">Role</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => handleInputChange('role', value)}
               >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
-              </Button>
+                <SelectTrigger className={`h-9 sm:h-10 ${getFieldError('role') ? 'border-destructive' : ''}`}>
+                  <SelectValue placeholder="Select role" className="text-sm" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Admin">Admin</SelectItem>
+                  <SelectItem value="Employee">Employee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="department" className="text-sm font-medium">Department</Label>
+              <Select
+                value={formData.department}
+                onValueChange={(value) => handleInputChange('department', value)}
+              >
+                <SelectTrigger className={`h-9 sm:h-10 ${getFieldError('department') ? 'border-destructive' : ''}`}>
+                  <SelectValue placeholder="Select dept." className="text-sm" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map(dept => (
+                    <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <div className="relative">
-              <Input
-                id="confirmPassword"
-                type={showConfirmPassword ? 'text' : 'password'}
-                placeholder="Confirm your password"
-                value={formData.confirmPassword}
-                onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
-                className={getFieldError('confirmPassword') ? 'border-destructive' : ''}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                {showConfirmPassword ? (
-                  <EyeOff className="h-4 w-4 text-muted-foreground" />
-                ) : (
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                )}
-              </Button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Create password"
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  className={`pr-10 h-9 sm:h-10 ${getFieldError('password') ? 'border-destructive' : ''}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-2 sm:px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  placeholder="Confirm password"
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  className={`pr-10 h-9 sm:h-10 ${getFieldError('confirmPassword') ? 'border-destructive' : ''}`}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-2 sm:px-3 py-2 hover:bg-transparent"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  ) : (
+                    <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <Button type="submit" className="w-full">
+          <Button type="submit" className="w-full h-9 sm:h-10 text-sm sm:text-base">
             <div className="flex items-center gap-2">
-              <UserPlus className="h-4 w-4" />
-              Create Account
+              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-sm sm:text-base">Create Account</span>
             </div>
           </Button>
         </form>
 
-        <div className="text-center">
+        <div className="text-center pt-2 sm:pt-0">
           <Button
             variant="link"
             onClick={onToggleMode}
-            className="text-sm"
+            className="text-xs sm:text-sm p-0 h-auto"
           >
             Already have an account? Sign in
           </Button>

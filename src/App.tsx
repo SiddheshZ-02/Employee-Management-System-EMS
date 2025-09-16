@@ -2,6 +2,7 @@ import { Provider } from "react-redux";
 import { store } from "@/store";
 import { Toaster as Sonner, Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ThemeProvider } from "@/components/ui/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 
@@ -23,9 +24,10 @@ const queryClient = new QueryClient();
 const App = () => (
   <Provider store={store}>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
+      <ThemeProvider defaultTheme="system" storageKey="ems-ui-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
         <HashRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
@@ -66,6 +68,7 @@ const App = () => (
           </Routes>
         </HashRouter>
       </TooltipProvider>
+    </ThemeProvider>
     </QueryClientProvider>
   </Provider>
 );

@@ -53,6 +53,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { BASE_URL } from "@/constant/Config";
 
 export const EmployeeManagement = () => {
   const { employees: reduxEmployees } = useAppSelector(
@@ -128,7 +129,7 @@ export const EmployeeManagement = () => {
 
   const fetchEmployee = async () => {
     try {
-      const response = await fetch("https://ems-api-data.onrender.com/employees", {
+      const response = await fetch(BASE_URL + `/employees`, {
         method: "GET",
         headers: {
           // accesstoken: "${token.access_token}", // Uncomment if token available
@@ -152,7 +153,7 @@ export const EmployeeManagement = () => {
         ...formData,
         joinDate: new Date().toISOString().split("T")[0],
       };
-      const response = await fetch("https://ems-api-data.onrender.com/employees", {
+      const response = await fetch(BASE_URL + `/employees`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
@@ -178,17 +179,14 @@ export const EmployeeManagement = () => {
 
   const fetchUpdateEmployee = async (employee: Employee) => {
     try {
-      const response = await fetch(
-        `https://ems-api-data.onrender.com/employees/${employee.id}`,
-        {
-          method: "PUT",
-          body: JSON.stringify(employee),
-          headers: {
-            // accesstoken: "${token.access_token}",
-            "Content-Type": "application/json",
-          },
-        }
-      );
+      const response = await fetch(BASE_URL + ` /employees/${employee.id}`, {
+        method: "PUT",
+        body: JSON.stringify(employee),
+        headers: {
+          // accesstoken: "${token.access_token}",
+          "Content-Type": "application/json",
+        },
+      });
       const res = await response.json();
       dispatch(updateEmployee(res));
       fetchEmployee();
@@ -208,12 +206,15 @@ export const EmployeeManagement = () => {
 
   const fetchDeleteEmployee = async (employee: Employee) => {
     try {
-      await fetch(`https://ems-api-data.onrender.com/employees/${employee.id}`, {
-        method: "DELETE",
-        headers: {
-          // accesstoken: "${token.access_token}",
-        },
-      });
+      await fetch(
+         BASE_URL +`/employees/${employee.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            // accesstoken: "${token.access_token}",
+          },
+        }
+      );
       dispatch(deleteEmployee(employee.id));
       fetchEmployee();
       toast({
@@ -294,351 +295,386 @@ export const EmployeeManagement = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold">Employee Management</h2>
-          <p className="text-muted-foreground">
-            Manage your organization's employees and their information
-          </p>
-        </div>
-      </div>
-
-      <Card>
-        <CardHeader>
+    <div className="w-full min-h-full bg-background">
+      <div className="w-full h-full p-4 md:p-6 lg:p-8">
+        <div className="space-y-6 w-full">
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>All Employees</CardTitle>
-              <CardDescription>
-                View and manage employee records ({employees.length} total)
-              </CardDescription>
+              <h2 className="text-3xl font-bold">Employee Management</h2>
+              <p className="text-muted-foreground">
+                Manage your organization's employees and their information
+              </p>
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button onClick={resetForm}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Employee
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[425px]">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingEmployee ? "Edit Employee" : "Add New Employee"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {editingEmployee
-                      ? "Update employee information below."
-                      : "Enter the details for the new employee."}
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit}>
-                  <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                      <Label htmlFor="name">Full Name</Label>
-                      <Input
-                        id="name"
-                        value={formData.name}
-                        onChange={(e) =>
-                          setFormData({ ...formData, name: e.target.value })
-                        }
-                        placeholder="Enter full name"
-                      />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) =>
-                          setFormData({ ...formData, email: e.target.value })
-                        }
-                        placeholder="Enter email address"
-                      />
-                    </div>
-                    {!editingEmployee && (
-                      <>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <CardTitle className="text-lg sm:text-xl">
+                    All Employees
+                  </CardTitle>
+                  <CardDescription className="text-sm">
+                    View and manage employee records ({employees.length} total)
+                  </CardDescription>
+                </div>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={resetForm}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Employee
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
+                    <DialogHeader>
+                      <DialogTitle>
+                        {editingEmployee ? "Edit Employee" : "Add New Employee"}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {editingEmployee
+                          ? "Update employee information below."
+                          : "Enter the details for the new employee."}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit}>
+                      <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="password">Password</Label>
+                          <Label htmlFor="name">Full Name</Label>
                           <Input
-                            id="password"
-                            type="password"
-                            value={formData.password}
+                            id="name"
+                            value={formData.name}
                             onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                password: e.target.value,
-                              })
+                              setFormData({ ...formData, name: e.target.value })
                             }
-                            placeholder="Enter password"
+                            placeholder="Enter full name"
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="confirmPassword">
-                            Confirm Password
-                          </Label>
+                          <Label htmlFor="email">Email</Label>
                           <Input
-                            id="confirmPassword"
-                            type="password"
-                            value={formData.confirmPassword}
+                            id="email"
+                            type="email"
+                            value={formData.email}
                             onChange={(e) =>
                               setFormData({
                                 ...formData,
-                                confirmPassword: e.target.value,
+                                email: e.target.value,
                               })
                             }
-                            placeholder="Confirm password"
+                            placeholder="Enter email address"
+                          />
+                        </div>
+                        {!editingEmployee && (
+                          <>
+                            <div className="grid gap-2">
+                              <Label htmlFor="password">Password</Label>
+                              <Input
+                                id="password"
+                                type="password"
+                                value={formData.password}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    password: e.target.value,
+                                  })
+                                }
+                                placeholder="Enter password"
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="confirmPassword">
+                                Confirm Password
+                              </Label>
+                              <Input
+                                id="confirmPassword"
+                                type="password"
+                                value={formData.confirmPassword}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    confirmPassword: e.target.value,
+                                  })
+                                }
+                                placeholder="Confirm password"
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="role">Role</Label>
+                              <Select
+                                value={formData.role}
+                                onValueChange={(value) =>
+                                  setFormData({ ...formData, role: value })
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="employee">
+                                    Employee
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </>
+                        )}
+                        <div className="grid gap-2">
+                          <Label htmlFor="role">Position</Label>
+                          <Input
+                            id="role"
+                            value={formData.position}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                position: e.target.value,
+                              })
+                            }
+                            placeholder="e.g., Senior Developer"
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="role">Role</Label>
+                          <Label htmlFor="department">Department</Label>
                           <Select
-                            value={formData.role}
+                            value={formData.department}
                             onValueChange={(value) =>
-                              setFormData({ ...formData, role: value })
+                              setFormData({ ...formData, department: value })
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
+                              <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="employee">Employee</SelectItem>
+                              {departments.map((dept) => {
+                                if (typeof dept === "string") {
+                                  return (
+                                    <SelectItem key={dept} value={dept}>
+                                      {dept}
+                                    </SelectItem>
+                                  );
+                                } else {
+                                  return (
+                                    <SelectItem key={dept.id} value={dept.name}>
+                                      {dept.name}
+                                    </SelectItem>
+                                  );
+                                }
+                              })}
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="grid gap-2">
+                          <Label htmlFor="status">Status</Label>
+                          <Select
+                            value={formData.status}
+                            onValueChange={(value: "Active" | "Inactive") =>
+                              setFormData({ ...formData, status: value })
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Active">Active</SelectItem>
+                              <SelectItem value="Inactive">Inactive</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button type="submit" className="w-full sm:w-auto">
+                          {editingEmployee ? "Update Employee" : "Add Employee"}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                  <Input
+                    placeholder="Search employees..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Position</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Join Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedEmployees.map((employee) => (
+                      <TableRow key={employee.id}>
+                        <TableCell className="font-medium">
+                          <div className="min-w-0">
+                            <div className="font-medium truncate">
+                              {employee.name}
+                            </div>
+                            <div className="text-sm text-muted-foreground sm:hidden truncate">
+                              {employee.email}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className=" sm:table-cell">
+                          <div className="truncate">{employee.email}</div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="truncate">{employee.position}</div>
+                        </TableCell>
+                        <TableCell className=" md:table-cell">
+                          <div className="truncate">{employee.department}</div>
+                        </TableCell>
+                        <TableCell className=" lg:table-cell">
+                          {new Date(employee.joinDate).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              employee.status === "Active"
+                                ? "default"
+                                : "secondary"
+                            }
+                            className="shrink-0"
+                          >
+                            {employee.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(employee)}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(employee)}
+                              className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Advanced Pagination Controls with Ellipsis */}
+              <div className="mt-4 flex justify-center">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage((prev) => Math.max(prev - 1, 1));
+                        }}
+                        isActive={false}
+                      />
+                    </PaginationItem>
+                    {/* Show first page */}
+                    {totalPages > 5 && currentPage > 3 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            isActive={currentPage === 1}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCurrentPage(1);
+                            }}
+                          >
+                            1
+                          </PaginationLink>
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
                       </>
                     )}
-                    <div className="grid gap-2">
-                      <Label htmlFor="role">Position</Label>
-                      <Input
-                        id="role"
-                        value={formData.position}
-                        onChange={(e) =>
-                          setFormData({ ...formData, position: e.target.value })
-                        }
-                        placeholder="e.g., Senior Developer"
+                    {/* Show page numbers around current page */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter((page) => {
+                        if (totalPages <= 5) return true;
+                        if (currentPage <= 3) return page <= 5;
+                        if (currentPage >= totalPages - 2)
+                          return page >= totalPages - 4;
+                        return Math.abs(page - currentPage) <= 2;
+                      })
+                      .map((page) => (
+                        <PaginationItem key={page}>
+                          <PaginationLink
+                            href="#"
+                            isActive={currentPage === page}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCurrentPage(page);
+                            }}
+                          >
+                            {page}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                    {/* Show last page */}
+                    {totalPages > 5 && currentPage < totalPages - 2 && (
+                      <>
+                        <PaginationItem>
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                        <PaginationItem>
+                          <PaginationLink
+                            href="#"
+                            isActive={currentPage === totalPages}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setCurrentPage(totalPages);
+                            }}
+                          >
+                            {totalPages}
+                          </PaginationLink>
+                        </PaginationItem>
+                      </>
+                    )}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setCurrentPage((prev) =>
+                            Math.min(prev + 1, totalPages)
+                          );
+                        }}
+                        isActive={false}
                       />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="department">Department</Label>
-                      <Select
-                        value={formData.department}
-                        onValueChange={(value) =>
-                          setFormData({ ...formData, department: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select department" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map((dept) => {
-                            if (typeof dept === "string") {
-                              return (
-                                <SelectItem key={dept} value={dept}>
-                                  {dept}
-                                </SelectItem>
-                              );
-                            } else {
-                              return (
-                                <SelectItem key={dept.id} value={dept.name}>
-                                  {dept.name}
-                                </SelectItem>
-                              );
-                            }
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={formData.status}
-                        onValueChange={(value: "Active" | "Inactive") =>
-                          setFormData({ ...formData, status: value })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Active">Active</SelectItem>
-                          <SelectItem value="Inactive">Inactive</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button type="submit">
-                       {/* Removed misplaced div */}
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4 mb-6">
-            <div className="relative flex-1 max-w-sm">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <Input
-                placeholder="Search employees..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Position</TableHead>
-                  <TableHead>Department</TableHead>
-                  <TableHead>Join Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {paginatedEmployees.map((employee) => (
-                  <TableRow key={employee.id}>
-                    <TableCell className="font-medium">
-                      {employee.name}
-                    </TableCell>
-                    <TableCell>{employee.email}</TableCell>
-                    <TableCell>{employee.position}</TableCell>
-                    <TableCell>{employee.department}</TableCell>
-                    <TableCell>
-                      {new Date(employee.joinDate).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={employee.status === "Active" ? "default" : "secondary"}
-                      >
-                        {employee.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(employee)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(employee)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Advanced Pagination Controls with Ellipsis */}
-          <div className="mt-4 flex justify-center">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentPage((prev) => Math.max(prev - 1, 1));
-                    }}
-                    isActive={false}
-                  />
-                </PaginationItem>
-                {/* Show first page */}
-                {totalPages > 5 && currentPage > 3 && (
-                  <>
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === 1}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(1);
-                        }}
-                      >
-                        1
-                      </PaginationLink>
                     </PaginationItem>
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                  </>
-                )}
-                {/* Show page numbers around current page */}
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter((page) => {
-                    if (totalPages <= 5) return true;
-                    if (currentPage <= 3) return page <= 5;
-                    if (currentPage >= totalPages - 2)
-                      return page >= totalPages - 4;
-                    return Math.abs(page - currentPage) <= 2;
-                  })
-                  .map((page) => (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === page}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(page);
-                        }}
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  ))}
-                {/* Show last page */}
-                {totalPages > 5 && currentPage < totalPages - 2 && (
-                  <>
-                    <PaginationItem>
-                      <PaginationEllipsis />
-                    </PaginationItem>
-                    <PaginationItem>
-                      <PaginationLink
-                        href="#"
-                        isActive={currentPage === totalPages}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage(totalPages);
-                        }}
-                      >
-                        {totalPages}
-                      </PaginationLink>
-                    </PaginationItem>
-                  </>
-                )}
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setCurrentPage((prev) => Math.min(prev + 1, totalPages));
-                    }}
-                    isActive={false}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-          </div>
-        </CardContent>
-      </Card>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 };
