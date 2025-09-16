@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Clock, Calendar, CheckCircle, XCircle, Timer, AlertCircle } from "lucide-react";
+import { Clock, Calendar, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,

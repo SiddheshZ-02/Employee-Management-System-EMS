@@ -13,9 +13,8 @@ import {
 } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import {
-  Users,
+  
   Building2,
-  TrendingUp,
   UserCheck,
   Calendar,
 } from "lucide-react";
@@ -25,46 +24,46 @@ import { setEmployees } from "@/store/slices/employeeSlice";
 import { setDepartments } from "@/store/slices/departmentSlice";
 import { BASE_URL } from "@/constant/Config";
 
-interface StatCardProps {
-  title: string;
-  value: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  trend?: string;
-}
+// interface StatCardProps {
+//   title: string;
+//   value: string;
+//   description: string;
+//   icon: React.ComponentType<{ className?: string }>;
+//   trend?: string;
+// }
 
-const StatCard = ({
-  title,
-  value,
-  description,
-  icon: Icon,
-  trend,
-}: StatCardProps) => (
-  <Card className="hover-lift transition-smooth border-0 shadow-lg bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate pr-2">
-        {title}
-      </CardTitle>
-      <div className="p-1.5 sm:p-2 rounded-full bg-primary/10 shrink-0">
-        <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
-      </div>
-    </CardHeader>
-    <CardContent className="pt-0">
-      <div className="text-xl sm:text-2xl font-bold text-foreground animate-fade-in truncate">
-        {value}
-      </div>
-      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-        {trend && (
-          <span className="text-green-600 font-medium flex items-center gap-1 shrink-0">
-            <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
-            <span className="hidden sm:inline">{trend}</span>
-          </span>
-        )}
-        <span className="truncate">{description}</span>
-      </p>
-    </CardContent>
-  </Card>
-);
+// const StatCard = ({
+//   title,
+//   value,
+//   description,
+//   icon: Icon,
+//   trend,
+// }: StatCardProps) => (
+//   <Card className="hover-lift transition-smooth border-0 shadow-lg bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
+//     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+//       <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground truncate pr-2">
+//         {title}
+//       </CardTitle>
+//       <div className="p-1.5 sm:p-2 rounded-full bg-primary/10 shrink-0">
+//         <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+//       </div>
+//     </CardHeader>
+//     <CardContent className="pt-0">
+//       <div className="text-xl sm:text-2xl font-bold text-foreground animate-fade-in truncate">
+//         {value}
+//       </div>
+//       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+//         {trend && (
+//           <span className="text-green-600 font-medium flex items-center gap-1 shrink-0">
+//             <TrendingUp className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
+//             <span className="hidden sm:inline">{trend}</span>
+//           </span>
+//         )}
+//         <span className="truncate">{description}</span>
+//       </p>
+//     </CardContent>
+//   </Card>
+// );
 
 export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
@@ -83,9 +82,9 @@ export const AdminDashboard = () => {
       .then((data) => dispatch(setDepartments(data)));
   }, [dispatch]);
 
-  const activeEmployees = employees.filter(
-    (emp) => emp.status === "Active"
-  ).length;
+  // const activeEmployees = employees.filter(
+  //   (emp) => emp.status === "Active"
+  // ).length;
   // const totalBudget = departments.reduce((sum, dept) => sum + dept.budget, 0);
 
   return (
@@ -95,7 +94,7 @@ export const AdminDashboard = () => {
           {/* Welcome Header */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 animate-slide-in-left">
             <div className="min-w-0 flex-1">
-              <h2 className="text-2xl sm:text-3xl font-bold text-foreground bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              <h2 className="text-2xl sm:text-3xl font-bold  bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
                 Welcome back, {user?.name}! 👋
               </h2>
               <p className="text-muted-foreground mt-2">

@@ -422,7 +422,7 @@ export const DepartmentDistributionChart = () => {
                 outerRadius={120}
                 fill="#8884d8"
                 dataKey="value"
-                label={(props: any) => `${props.name}: ${props.value}%`}
+                // label={(props: any) => `${props.name}: ${props.value}%`}
                 labelLine={false}
                 fontSize={10}
               >
@@ -463,7 +463,8 @@ export const WeeklyAttendanceChart = () => {
       try {
         setLoading(true);
         const [attendanceRes, employeeRes] = await Promise.all([
-          fetch(BASE_URL + `/a BASE_URL +``/employees`),
+          fetch(BASE_URL + `/attendance`),
+          fetch(BASE_URL + `/employees`),
         ]);
 
         const attendance: AttendanceRecord[] = await attendanceRes.json();
