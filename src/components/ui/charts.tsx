@@ -19,8 +19,7 @@ import {
   BarChart,
   Bar,
   Legend,
-  LineChart,
-  Line,
+  
 } from "recharts";
 import { useState, useEffect } from "react";
 import {
@@ -596,7 +595,7 @@ export const WeeklyAttendanceChart = () => {
                   boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
                   fontSize: "12px",
                 }}
-                formatter={(value: number, name: string, props: any) => [
+                formatter={(value: number, name: string, ) => [
                   `${value} employees`,
                   name === "present" ? "Present" : "Absent",
                 ]}

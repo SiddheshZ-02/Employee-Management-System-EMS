@@ -170,7 +170,7 @@ export const DepartmentManagement = () => {
       // Update department via API
       try {
         const response = await fetch(
-           BASE_URL +` /departments/${editingDepartment.id}`,
+          BASE_URL + `/departments/${editingDepartment.id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },

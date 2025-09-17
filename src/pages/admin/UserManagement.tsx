@@ -144,11 +144,21 @@ export const UserManagement = () => {
           // accesstoken: "${token.access_token}", // Uncomment if token available
         },
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
       setAdmins(res);
       // dispatch(setAdmins(res));
     } catch (error) {
-      console.log(error);
+      console.error('Failed to fetch admins:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load admins. Please check your connection and try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -169,6 +179,12 @@ export const UserManagement = () => {
           "Content-Type": "application/json",
         },
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
       dispatch(addAdmin(res));
       fetchAdmins();
@@ -177,10 +193,11 @@ export const UserManagement = () => {
         description: `${formData.name} has been added successfully`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Failed to add admin:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to add Admin",
+        description: `Failed to add admin: ${message}`,
         variant: "destructive",
       });
     }
@@ -215,7 +232,7 @@ export const UserManagement = () => {
 
   const fetchDeleteAdmin = async (admin: Admins) => {
     try {
-      await fetch(BASE_URL + ` /admins/${admin.id}`, {
+      await fetch(BASE_URL + `/admins/${admin.id}`, {
         method: "DELETE",
         headers: {
           // accesstoken: "${token.access_token}",

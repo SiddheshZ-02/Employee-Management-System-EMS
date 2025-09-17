@@ -79,7 +79,7 @@ const AttendanceTracking = () => {
       });
       
       try {
-        const response = await fetch( BASE_URL +`/attendance`, {
+        const response = await fetch(BASE_URL + `/attendance`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -92,16 +92,20 @@ const AttendanceTracking = () => {
             checkin_timestamp: now.toISOString(),
           }),
         });
-        const record = await response.json();
-        if (response.ok) {
-          dispatch(clockIn({ record }));
-          toast.success(`Clocked in successfully at ${time_in}!`);
-          fetchAttendance();
-        } else {
-          toast.error("Failed to clock in.");
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
         }
+        
+        const record = await response.json();
+        dispatch(clockIn({ record }));
+        toast.success(`Clocked in successfully at ${time_in}!`);
+        fetchAttendance();
       } catch (error) {
-        toast.error("Error clocking in.");
+        console.error('Failed to clock in:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        toast.error(`Failed to clock in: ${message}`);
       }
     }
   };
@@ -125,7 +129,7 @@ const AttendanceTracking = () => {
       
       try {
         const response = await fetch(
-           BASE_URL +` /attendance/${todayRecord.id}`,
+          BASE_URL + `/attendance/${todayRecord.id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -138,17 +142,21 @@ const AttendanceTracking = () => {
             }),
           }
         );
-        const record = await response.json();
-        if (response.ok) {
-          dispatch(clockOut({ record }));
-          toast.success(`Clocked out successfully at ${time_out}! Total working time: ${workinghours}h ${workingminutes}m`);
-          fetchAttendance();
-          dispatch(loadTodayRecord({ employeeId: user.id }));
-        } else {
-          toast.error("Failed to clock out: " + (record?.message || JSON.stringify(record)));
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
         }
+        
+        const record = await response.json();
+        dispatch(clockOut({ record }));
+        toast.success(`Clocked out successfully at ${time_out}! Total working time: ${workinghours}h ${workingminutes}m`);
+        fetchAttendance();
+        dispatch(loadTodayRecord({ employeeId: user.id }));
       } catch (error) {
-        toast.error("Error clocking out: " + (error instanceof Error ? error.message : String(error)));
+        console.error('Failed to clock out:', error);
+        const message = error instanceof Error ? error.message : 'Unknown error occurred';
+        toast.error(`Failed to clock out: ${message}`);
       }
     }
   };
@@ -161,10 +169,16 @@ const AttendanceTracking = () => {
           "Content-Type": "application/json",
         },
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
       setAttendance(res);
     } catch (error) {
-      console.log("Error fetching attendance data:", error);
+      console.error("Error fetching attendance data:", error);
+      toast.error("Failed to load attendance data. Please refresh the page and try again.");
     }
   };
 

@@ -40,6 +40,7 @@ import {
   addEmployee,
   updateEmployee,
   deleteEmployee,
+  setEmployees,
   type Employee,
 } from "@/store/slices/employeeSlice";
 import { Plus, Edit, Trash2, Search } from "lucide-react";
@@ -65,11 +66,8 @@ export const EmployeeManagement = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  // Sync local state with Redux when Redux changes
-  useEffect(() => {
-    setEmployees(reduxEmployees);
-  }, [reduxEmployees]);
+  // Use Redux state as primary source
+  const employees = reduxEmployees;
 
   const [formData, setFormData] = useState({
     name: "",
@@ -135,11 +133,20 @@ export const EmployeeManagement = () => {
           // accesstoken: "${token.access_token}", // Uncomment if token available
         },
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
-      setEmployees(res);
-      // dispatch(setEmployees(res));
+      dispatch(setEmployees(res));
     } catch (error) {
-      console.log(error);
+      console.error('Failed to fetch employees:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load employees. Please check your connection and try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -160,6 +167,12 @@ export const EmployeeManagement = () => {
           "Content-Type": "application/json",
         },
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
       dispatch(addEmployee(res));
       fetchEmployee();
@@ -168,10 +181,11 @@ export const EmployeeManagement = () => {
         description: `${formData.name} has been added successfully`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Failed to add employee:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to add employee",
+        description: `Failed to add employee: ${message}`,
         variant: "destructive",
       });
     }
@@ -179,7 +193,7 @@ export const EmployeeManagement = () => {
 
   const fetchUpdateEmployee = async (employee: Employee) => {
     try {
-      const response = await fetch(BASE_URL + ` /employees/${employee.id}`, {
+      const response = await fetch(BASE_URL + `/employees/${employee.id}`, {
         method: "PUT",
         body: JSON.stringify(employee),
         headers: {
@@ -187,6 +201,12 @@ export const EmployeeManagement = () => {
           "Content-Type": "application/json",
         },
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+      
       const res = await response.json();
       dispatch(updateEmployee(res));
       fetchEmployee();
@@ -195,10 +215,11 @@ export const EmployeeManagement = () => {
         description: `${employee.name} has been updated successfully`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Failed to update employee:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to update employee",
+        description: `Failed to update employee: ${message}`,
         variant: "destructive",
       });
     }
@@ -206,8 +227,8 @@ export const EmployeeManagement = () => {
 
   const fetchDeleteEmployee = async (employee: Employee) => {
     try {
-      await fetch(
-         BASE_URL +`/employees/${employee.id}`,
+      const response = await fetch(
+        BASE_URL + `/employees/${employee.id}`,
         {
           method: "DELETE",
           headers: {
@@ -215,6 +236,12 @@ export const EmployeeManagement = () => {
           },
         }
       );
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+      
       dispatch(deleteEmployee(employee.id));
       fetchEmployee();
       toast({
@@ -222,10 +249,11 @@ export const EmployeeManagement = () => {
         description: `${employee.name} has been removed from the system`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Failed to delete employee:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to delete employee",
+        description: `Failed to delete employee: ${message}`,
         variant: "destructive",
       });
     }

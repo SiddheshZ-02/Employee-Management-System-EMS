@@ -12,7 +12,7 @@ export const Auth = () => {
   useEffect(() => {
     if (isAuthenticated && user) {
       // Redirect based on role
-      if (user.role.toLowerCase() === 'admin') {
+      if (user.role === 'Admin') {
         navigate('/admin/dashboard');
       } else {
         navigate('/employee/dashboard');

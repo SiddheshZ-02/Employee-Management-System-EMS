@@ -1,4 +1,5 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
+import { BASE_URL } from "@/constant/Config";
 // import { useDispatch } from 'react-redux';
 
 export type UserRole = "Admin" | "Employee";
@@ -129,49 +130,47 @@ const authSlice = createSlice({
   },
 });
 
-// Async login action
-export const loginAsync =
-  (email: string, password: string) => (dispatch: any) => {
-    dispatch(loginStart());
-
-    // Simulate API call
-    setTimeout(() => {
-      const account = demoAccounts.find(
-        (acc) => acc.email === email && acc.password === password
-      );
-
+// Async login action with real API integration
+export const loginAsync = (email: string, password: string) => (dispatch: any) => {
+  dispatch(loginStart());
+  
+  // First check demo accounts for backward compatibility
+  const demoAccount = demoAccounts.find(
+    (acc) => acc.email === email && acc.password === password
+  );
+  
+  if (demoAccount) {
+    const { password: _, ...user } = demoAccount;
+    const token = `token_${Date.now()}`;
+    dispatch(loginSuccess({ user, token }));
+    return;
+  }
+  
+  // Fetch both employees and admins from db.json API
+  Promise.all([
+    fetch(BASE_URL + '/employees').then(res => res.json()),
+    fetch(BASE_URL + '/admins').then(res => res.json())
+  ])
+    .then(([employees, admins]) => {
+      const allUsers = [...employees, ...admins];
+      const account = allUsers.find((acc: any) => acc.email === email && acc.password === password);
+      
       if (account) {
-        const { password: _, ...user } = account;
+        const { password: _, ...userData } = account;
+        // Map database role to UI role format
+        const mappedRole = userData.role === 'admin' ? 'Admin' : 'Employee';
+        const user = { ...userData, role: mappedRole };
         const token = `token_${Date.now()}`;
         dispatch(loginSuccess({ user, token }));
       } else {
         dispatch(loginFailure());
       }
-    }, 1000);
-  };
-
-// export const loginAsync = (email: string, password: string) => (dispatch: any) => {
-//   dispatch(loginStart());
-//   // Fetch both employees and admins from db.json API
-//   Promise.all([
-//     fetch('https://ems-api-data.onrender.com/employees').then(res => res.json()),
-//     fetch('https://ems-api-data.onrender.com/admins').then(res => res.json())
-//   ])
-//     .then(([employees, admins]) => {
-//       const allUsers = [...employees, ...admins];
-//       const account = allUsers.find((acc: any) => acc.email === email && acc.password === password);
-//       if (account) {
-//         const { password: _, ...user } = account;
-//         const token = `token_${Date.now()}`;
-//         dispatch(loginSuccess({ user, token }));
-//       } else {
-//         dispatch(loginFailure());
-//       }
-//     })
-//     .catch(() => {
-//       dispatch(loginFailure());
-//     });
-// };
+    })
+    .catch((error) => {
+      console.error('Authentication error:', error);
+      dispatch(loginFailure());
+    });
+};
 
 export const {
   loginStart,
