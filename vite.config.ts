@@ -11,7 +11,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "/Employee-Management-System-EMS/",
+  // Use relative base so built assets are referenced relative to index.html.
+  // This works for Netlify deployments (root) and for archives served from subpaths.
+  base: './',
   build: {
     rollupOptions: {
       output: {
