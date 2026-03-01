@@ -39,7 +39,7 @@ import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { deleteDepartment, setDepartments, type Department } from "@/store/slices/departmentSlice";
 import { setEmployees } from "@/store/slices/employeeSlice";
-import { Plus, Edit, Trash2, Search, Building2, Users } from "lucide-react";
+import { Plus, Edit, Trash2, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   Pagination,

@@ -35,8 +35,8 @@ export const EmployeeDetails = () => {
   const { token } = useAppSelector((state) => state.auth);
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<EmployeeDetailsResponse["employee"] | null>(null);
-  const [summary, setSummary] = useState<EmployeeDetailsResponse["attendanceSummary"] | null>(null);
-  const [pendingLeaves, setPendingLeaves] = useState<number | null>(null);
+
+
 
   const fetchDetails = useCallback(async () => {
     if (!token || !id) {
@@ -59,8 +59,8 @@ export const EmployeeDetails = () => {
         return;
       }
       setEmployee(data.employee);
-      setSummary(data.attendanceSummary || null);
-      setPendingLeaves(typeof data.pendingLeaves === "number" ? data.pendingLeaves : null);
+
+
     } catch {
       toast({ title: "Error", description: "Network error while fetching details", variant: "destructive" });
     } finally {

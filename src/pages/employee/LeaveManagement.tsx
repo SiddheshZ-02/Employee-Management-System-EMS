@@ -44,7 +44,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useForm } from "react-hook-form";
-import { Calendar, Plus, X, CalendarDays, AlertCircle } from "lucide-react";
+import { Plus, X, CalendarDays, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { API_BASE_URL } from "@/constant/Config";

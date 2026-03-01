@@ -4,7 +4,7 @@ export interface LeaveRequest {
   id: string;
   employeeId: string;
   employeeName: string;
-  type: 'Vacation' | 'Sick' | 'Personal' | 'Maternity' | 'Paternity';
+  type: 'Vacation' | 'Sick' | 'Personal' | 'Maternity' | 'Paternity' | 'Casual' | 'Other';
   startDate: string;
   endDate: string;
   days: number;
