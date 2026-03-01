@@ -68,8 +68,8 @@ export const AttendanceTrendChart = () => {
       try {
         setLoading(true);
         const [attendanceRes, employeeRes] = await Promise.all([
-          fetch(API_BASE_URL + `/attendance`),
-          fetch(API_BASE_URL + `/employees`),
+          fetch(API_BASE_URL + `/api/attendance`),
+          fetch(API_BASE_URL + `/api/employees`),
         ]);
 
         const attendance: AttendanceRecord[] = await attendanceRes.json();
@@ -302,8 +302,8 @@ export const DepartmentDistributionChart = () => {
       try {
         setLoading(true);
         const [employeeRes, departmentRes] = await Promise.all([
-          fetch(API_BASE_URL + `/employees`),
-          fetch(API_BASE_URL + `/departments`),
+          fetch(API_BASE_URL + `/api/employees`),
+          fetch(API_BASE_URL + `/api/departments`),
         ]);
 
         const employees: Employee[] = await employeeRes.json();
@@ -454,8 +454,8 @@ export const WeeklyAttendanceChart = () => {
       try {
         setLoading(true);
         const [attendanceRes, employeeRes] = await Promise.all([
-          fetch(API_BASE_URL + `/attendance`),
-          fetch(API_BASE_URL + `/employees`),
+          fetch(API_BASE_URL + `/api/attendance`),
+          fetch(API_BASE_URL + `/api/employees`),
         ]);
 
         const attendance: AttendanceRecord[] = await attendanceRes.json();
@@ -635,7 +635,7 @@ export const LiveStatsCard = () => {
           return;
         }
 
-        const res = await fetch(`${API_BASE_URL}/admin/statistics`, {
+        const res = await fetch(`${API_BASE_URL}/api/admin/statistics`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

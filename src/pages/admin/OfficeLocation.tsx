@@ -63,7 +63,7 @@ export const OfficeLocationPage = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/office-locations`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/office-locations`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -136,7 +136,7 @@ export const OfficeLocationPage = () => {
       return false;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/office-locations`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/office-locations`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -180,7 +180,7 @@ export const OfficeLocationPage = () => {
         toast({ title: "Validation error", description: "Name, latitude, longitude, and radius are required", variant: "destructive" });
         return false;
       }
-      const res = await fetch(`${API_BASE_URL}/admin/office-locations/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/office-locations/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -230,7 +230,7 @@ export const OfficeLocationPage = () => {
     const id = locations[index]?.id;
     if (!id || !token) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/office-locations/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/office-locations/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

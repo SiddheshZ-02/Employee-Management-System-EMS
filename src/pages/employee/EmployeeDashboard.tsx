@@ -23,13 +23,13 @@ export const EmployeeDashboard = () => {
     const loadData = async () => {
       try {
         const [todayRes, historyRes, leaveRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/attendance/today`, {
+          fetch(`${API_BASE_URL}/api/attendance/today`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${API_BASE_URL}/attendance/history?period=month`, {
+          fetch(`${API_BASE_URL}/api/attendance/history?period=month`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${API_BASE_URL}/leave/my-requests`, {
+          fetch(`${API_BASE_URL}/api/leave/my-requests`, {
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
           }),
         ]);

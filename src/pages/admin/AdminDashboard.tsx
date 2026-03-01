@@ -105,10 +105,10 @@ export const AdminDashboard = () => {
     const fetchData = async () => {
       try {
         const [employeesRes, departmentsRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/admin/employees?page=1&limit=100`, {
+          fetch(`${API_BASE_URL}/api/admin/employees?page=1&limit=100`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch(`${API_BASE_URL}/admin/departments?page=1&limit=100`, {
+          fetch(`${API_BASE_URL}/api/admin/departments?page=1&limit=100`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

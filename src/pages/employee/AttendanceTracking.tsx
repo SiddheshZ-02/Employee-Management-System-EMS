@@ -93,7 +93,7 @@ const AttendanceTracking = () => {
         params.append("endDate", endDate);
       }
       const res = await fetch(
-        `${API_BASE_URL}/attendance/calendar?${params.toString()}`,
+        `${API_BASE_URL}/api/attendance/calendar?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

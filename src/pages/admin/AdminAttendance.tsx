@@ -42,7 +42,7 @@ export const AdminAttendance = () => {
       }
       try {
         setLoading(true);
-        const response = await fetch(`${API_BASE_URL}/admin/employees?page=1&limit=200`, {
+        const response = await fetch(`${API_BASE_URL}/api/admin/employees?page=1&limit=200`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

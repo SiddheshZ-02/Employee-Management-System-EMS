@@ -118,7 +118,7 @@ export const loginAsync =
     dispatch(loginStart());
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -166,7 +166,7 @@ export const logoutAsync =
   () => async (dispatch: AppDispatch, getState: () => RootState) => {
     const { token } = getState().auth;
     if (token) {
-      await fetch(`${API_BASE_URL}/auth/logout`, {
+      await fetch(`${API_BASE_URL}/api/auth/logout`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

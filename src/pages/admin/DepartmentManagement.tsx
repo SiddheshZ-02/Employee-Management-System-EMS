@@ -84,7 +84,7 @@ export const DepartmentManagement = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/departments`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/departments`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -135,7 +135,7 @@ export const DepartmentManagement = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/admin/employees?page=1&limit=100`,
+        `${API_BASE_URL}/api/admin/employees?page=1&limit=100`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -253,7 +253,7 @@ export const DepartmentManagement = () => {
         }
 
         const response = await fetch(
-          `${API_BASE_URL}/admin/departments/${editingDepartment.id}`,
+          `${API_BASE_URL}/api/admin/departments/${editingDepartment.id}`,
           {
             method: "PUT",
             headers: {
@@ -302,7 +302,7 @@ export const DepartmentManagement = () => {
         }
 
         const response = await fetch(
-          `${API_BASE_URL}/admin/departments`,
+          `${API_BASE_URL}/api/admin/departments`,
           {
             method: "POST",
             headers: {
@@ -356,7 +356,7 @@ export const DepartmentManagement = () => {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/admin/departments/${department.id}`,
+        `${API_BASE_URL}/api/admin/departments/${department.id}`,
         {
           method: "DELETE",
           headers: {

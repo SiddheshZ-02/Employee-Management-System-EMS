@@ -76,7 +76,7 @@ const LeaveManagement = () => {
     try {
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/leave/my-requests`, {
+      const response = await fetch(`${API_BASE_URL}/api/leave/my-requests`, {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -175,7 +175,7 @@ const LeaveManagement = () => {
     try {
       const leaveType = data.type;
 
-      const response = await fetch(`${API_BASE_URL}/leave/request`, {
+      const response = await fetch(`${API_BASE_URL}/api/leave/request`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -207,7 +207,7 @@ const LeaveManagement = () => {
   const handleCancel = async (requestId: string) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/leave/request/${requestId}`,
+        `${API_BASE_URL}/api/leave/request/${requestId}`,
         {
           method: "DELETE",
           headers: {

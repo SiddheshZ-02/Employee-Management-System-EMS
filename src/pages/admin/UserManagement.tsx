@@ -142,7 +142,7 @@ export const UserManagement = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/admins`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/admins`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -218,7 +218,7 @@ export const UserManagement = () => {
             ? "manager"
             : "admin",
       };
-      const response = await fetch(`${API_BASE_URL}/admin/admins`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/admins`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
@@ -292,7 +292,7 @@ export const UserManagement = () => {
         position: admin.position,
       };
 
-      const response = await fetch(`${API_BASE_URL}/admin/admins/${admin.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/admins/${admin.id}`, {
         method: "PUT",
         body: JSON.stringify(payload),
         headers: {
@@ -347,7 +347,7 @@ export const UserManagement = () => {
       return;
     }
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/admins/${admin.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/admins/${admin.id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

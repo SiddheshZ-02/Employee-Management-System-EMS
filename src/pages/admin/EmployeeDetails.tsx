@@ -44,7 +44,7 @@ export const EmployeeDetails = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/employees/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/employees/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) {
@@ -75,7 +75,7 @@ export const EmployeeDetails = () => {
   const toggleStatus = async () => {
     if (!token || !id) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/employees/${id}/toggle-status`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/employees/${id}/toggle-status`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${token}` },
       });

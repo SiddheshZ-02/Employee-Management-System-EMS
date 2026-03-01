@@ -179,7 +179,7 @@ export const EmployeeManagement = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/admin/employees?page=1&limit=100`,
+        `${API_BASE_URL}/api/admin/employees?page=1&limit=100`,
         {
           method: "GET",
           headers: {
@@ -245,7 +245,7 @@ export const EmployeeManagement = () => {
         phone: formData.phone,
         position: formData.position,
       };
-      const response = await fetch(`${API_BASE_URL}/admin/employees`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/employees`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
@@ -326,7 +326,7 @@ export const EmployeeManagement = () => {
       };
 
       const response = await fetch(
-        `${API_BASE_URL}/admin/employees/${payload.id}`,
+        `${API_BASE_URL}/api/admin/employees/${payload.id}`,
         {
           method: "PUT",
           body: JSON.stringify(body),
@@ -392,7 +392,7 @@ export const EmployeeManagement = () => {
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/admin/employees/${employee.id}`,
+        `${API_BASE_URL}/api/admin/employees/${employee.id}`,
         {
           method: "DELETE",
           headers: {

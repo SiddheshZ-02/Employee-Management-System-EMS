@@ -98,7 +98,7 @@ export const AdminLeaveRequests = () => {
         params.append("limit", String(pageSize));
 
         const res = await fetch(
-          `${API_BASE_URL}/admin/leave-requests?${params.toString()}`,
+          `${API_BASE_URL}/api/admin/leave-requests?${params.toString()}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -199,7 +199,7 @@ export const AdminLeaveRequests = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/admin/leave-requests/${selectedRequest.id}`,
+        `${API_BASE_URL}/api/admin/leave-requests/${selectedRequest.id}`,
         {
           method: "PUT",
           headers: {

@@ -85,7 +85,7 @@ export const EmployeeAttendanceDetails = () => {
       return;
     }
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/employees/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/employees/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -140,7 +140,7 @@ export const EmployeeAttendanceDetails = () => {
       attendanceParams.append("limit", "365");
 
       const attendanceRes = await fetch(
-        `${API_BASE_URL}/admin/attendance?${attendanceParams.toString()}`,
+        `${API_BASE_URL}/api/admin/attendance?${attendanceParams.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -175,7 +175,7 @@ export const EmployeeAttendanceDetails = () => {
       leaveParams.append("limit", "365");
 
       const leaveRes = await fetch(
-        `${API_BASE_URL}/admin/leave-requests?${leaveParams.toString()}`,
+        `${API_BASE_URL}api/admin/leave-requests?${leaveParams.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

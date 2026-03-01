@@ -118,7 +118,7 @@ export function AppSidebar() {
 
     const fetchPendingLeaves = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/admin/statistics`, {
+        const res = await fetch(`${API_BASE_URL}/api/admin/statistics`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

@@ -28,7 +28,7 @@ export const AdminAccess = () => {
       }
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE_URL}/admin/weekoff`, {
+        const res = await fetch(`${API_BASE_URL}/api/admin/weekoff`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -68,7 +68,7 @@ export const AdminAccess = () => {
     }
     try {
       setSaving(true);
-      const res = await fetch(`${API_BASE_URL}/admin/weekoff`, {
+      const res = await fetch(`${API_BASE_URL}/api/admin/weekoff`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
