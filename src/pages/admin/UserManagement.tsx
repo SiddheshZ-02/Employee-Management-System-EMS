@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +40,7 @@ import {
   addAdmin,
   updateAdmin,
   deleteAdmin,
+  setAdmins as setAdminsAction,
   type Admins,
 } from "@/store/slices/adminSlice";
 import {
@@ -61,22 +62,22 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
 
 // import { useNavigate } from 'react-router-dom';
 
 export const UserManagement = () => {
   const { admins: reduxAdmins } = useAppSelector((state) => state.admin);
   const { departments } = useAppSelector((state) => state.departments);
+  const { token } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState<Admins | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-  const [admins, setAdmins] = useState<Admins[]>([]);
-  // Sync local state with Redux when Redux changes
+  const [admins, setLocalAdmins] = useState<Admins[]>([]);
   useEffect(() => {
-    setAdmins(reduxAdmins);
+    setLocalAdmins(reduxAdmins);
   }, [reduxAdmins]);
 
   const [formData, setFormData] = useState({
@@ -136,12 +137,15 @@ export const UserManagement = () => {
     setIsDialogOpen(true);
   };
 
-  const fetchAdmins = async () => {
+  const fetchAdmins = useCallback(async () => {
+    if (!token) {
+      return;
+    }
     try {
-      const response = await fetch(BASE_URL + `/admins`, {
+      const response = await fetch(`${API_BASE_URL}/admin/admins`, {
         method: "GET",
         headers: {
-          // accesstoken: "${token.access_token}", // Uncomment if token available
+          Authorization: `Bearer ${token}`,
         },
       });
       
@@ -150,8 +154,38 @@ export const UserManagement = () => {
       }
       
       const res = await response.json();
-      setAdmins(res);
-      // dispatch(setAdmins(res));
+
+      if (!res.success || !Array.isArray(res.admins)) {
+        throw new Error("Unexpected response while fetching admins");
+      }
+
+      interface BackendAdmin {
+        _id: string;
+        name: string;
+        email: string;
+        position?: string;
+        role?: string;
+        department?: string;
+        createdAt?: string;
+        isActive?: boolean;
+      }
+
+      const mapped: Admins[] = res.admins.map((adm: BackendAdmin) => ({
+        id: String(adm._id),
+        name: String(adm.name),
+        email: String(adm.email),
+        position: String(adm.position || adm.role || ""),
+        department: String(adm.department || ""),
+        joinDate: adm.createdAt
+          ? new Date(adm.createdAt).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        status: adm.isActive === false ? "Inactive" : "Active",
+        role: adm.role === "manager" ? "Manager" : "Admin",
+        password: "",
+      }));
+
+      setLocalAdmins(mapped);
+      dispatch(setAdminsAction(mapped));
     } catch (error) {
       console.error('Failed to fetch admins:', error);
       toast({
@@ -160,23 +194,36 @@ export const UserManagement = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [token, dispatch]);
 
   useEffect(() => {
     fetchAdmins();
-  }, []);
+  }, [fetchAdmins]);
 
   const fetchAddAdmins = async () => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to add admins.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const payload = {
         ...formData,
         joinDate: new Date().toISOString().split("T")[0],
+        role:
+          formData.role === "Manager"
+            ? "manager"
+            : "admin",
       };
-      const response = await fetch(BASE_URL + `/admins`, {
+      const response = await fetch(`${API_BASE_URL}/admin/admins`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       });
       
@@ -186,7 +233,27 @@ export const UserManagement = () => {
       }
       
       const res = await response.json();
-      dispatch(addAdmin(res));
+
+      if (!res.success || !res.admin) {
+        throw new Error("Unexpected response while adding admin");
+      }
+
+      const adm = res.admin;
+      const mapped: Admins = {
+        id: String(adm._id),
+        name: String(adm.name),
+        email: String(adm.email),
+        position: String(adm.position || adm.role || ""),
+        department: String(adm.department || ""),
+        joinDate: adm.createdAt
+          ? new Date(adm.createdAt).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        status: adm.isActive === false ? "Inactive" : "Active",
+        role: adm.role === "manager" ? "Manager" : "Admin",
+        password: "",
+      };
+
+      dispatch(addAdmin(mapped));
       fetchAdmins();
       toast({
         title: "Admin Added",
@@ -204,17 +271,57 @@ export const UserManagement = () => {
   };
 
   const fetchUpdateAdmin = async (admin: Admins) => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to update admins.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      const response = await fetch(BASE_URL + `/admins/${admin.id}`, {
+      const payload = {
+        name: admin.name,
+        email: admin.email,
+        department: admin.department,
+        isActive: admin.status === "Active",
+        role:
+          admin.role === "Manager"
+            ? "manager"
+            : "admin",
+        position: admin.position,
+      };
+
+      const response = await fetch(`${API_BASE_URL}/admin/admins/${admin.id}`, {
         method: "PUT",
-        body: JSON.stringify(admin),
+        body: JSON.stringify(payload),
         headers: {
-          // accesstoken: "${token.access_token}",
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       });
       const res = await response.json();
-      dispatch(updateAdmin(res));
+
+      if (!res.success || !res.admin) {
+        throw new Error("Unexpected response while updating admin");
+      }
+
+      const adm = res.admin;
+      const mapped: Admins = {
+        id: String(adm._id),
+        name: String(adm.name),
+        email: String(adm.email),
+        position: String(adm.position || adm.role || ""),
+        department: String(adm.department || ""),
+        joinDate: adm.createdAt
+          ? new Date(adm.createdAt).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        status: adm.isActive === false ? "Inactive" : "Active",
+        role: adm.role === "manager" ? "Manager" : "Admin",
+        password: "",
+      };
+
+      dispatch(updateAdmin(mapped));
       fetchAdmins();
       toast({
         title: "Admin Updated",
@@ -231,13 +338,29 @@ export const UserManagement = () => {
   };
 
   const fetchDeleteAdmin = async (admin: Admins) => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to delete admins.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
-      await fetch(BASE_URL + `/admins/${admin.id}`, {
+      const response = await fetch(`${API_BASE_URL}/admin/admins/${admin.id}`, {
         method: "DELETE",
         headers: {
-          // accesstoken: "${token.access_token}",
+          Authorization: `Bearer ${token}`,
         },
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || `HTTP error! status: ${response.status}`
+        );
+      }
+
       dispatch(deleteAdmin(admin.id));
       fetchAdmins();
       toast({
@@ -245,10 +368,11 @@ export const UserManagement = () => {
         description: `${admin.name} has been removed from the system`,
       });
     } catch (error) {
-      console.log(error);
+      console.error('Failed to delete admin:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error occurred';
       toast({
         title: "Error",
-        description: "Failed to delete Admin",
+        description: `Failed to delete Admin: ${message}`,
         variant: "destructive",
       });
     }

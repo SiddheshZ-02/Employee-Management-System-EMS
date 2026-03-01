@@ -8,8 +8,8 @@ export interface Admins {
   department: string;
   joinDate: string;
   status: "Active" | "Inactive";
-  role: "";
-  password: "";
+  role: "Admin" | "Manager";
+  password: string;
 }
 
 export interface AdminState {

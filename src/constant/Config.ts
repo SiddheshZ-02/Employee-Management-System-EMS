@@ -1,3 +1,5 @@
-const BASE_URL = "https://ems-api-data.onrender.com";
 
-export { BASE_URL };
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL 
+
+
+export {  API_BASE_URL };

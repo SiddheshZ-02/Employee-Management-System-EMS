@@ -1,5 +1,6 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
+import type { AppDispatch, RootState } from "@/store";
 // import { useDispatch } from 'react-redux';
 
 export type UserRole = "Admin" | "Employee";
@@ -10,6 +11,7 @@ export interface User {
   name: string;
   role: UserRole;
   department?: string;
+  phone?: string;
   avatar?: string;
 }
 
@@ -26,26 +28,6 @@ const initialState: AuthState = {
   isAuthenticated: false,
   loading: false,
 };
-
-// Demo accounts
-const demoAccounts = [
-  {
-    id: "1",
-    email: "admin@company.com",
-    password: "admin123",
-    name: "Admin",
-    role: "Admin" as UserRole,
-    department: "HR",
-  },
-  {
-    id: "2",
-    email: "employee@company.com",
-    password: "employee123",
-    name: "Siddhesh",
-    role: "Employee" as UserRole,
-    department: "Sales",
-  },
-];
 
 // const dispatch =useDispatch()
 const authSlice = createSlice({
@@ -131,46 +113,68 @@ const authSlice = createSlice({
 });
 
 // Async login action with real API integration
-export const loginAsync = (email: string, password: string) => (dispatch: any) => {
-  dispatch(loginStart());
-  
-  // First check demo accounts for backward compatibility
-  const demoAccount = demoAccounts.find(
-    (acc) => acc.email === email && acc.password === password
-  );
-  
-  if (demoAccount) {
-    const { password: _, ...user } = demoAccount;
-    const token = `token_${Date.now()}`;
-    dispatch(loginSuccess({ user, token }));
-    return;
-  }
-  
-  // Fetch both employees and admins from db.json API
-  Promise.all([
-    fetch(BASE_URL + '/employees').then(res => res.json()),
-    fetch(BASE_URL + '/admins').then(res => res.json())
-  ])
-    .then(([employees, admins]) => {
-      const allUsers = [...employees, ...admins];
-      const account = allUsers.find((acc: any) => acc.email === email && acc.password === password);
-      
-      if (account) {
-        const { password: _, ...userData } = account;
-        // Map database role to UI role format
-        const mappedRole = userData.role === 'admin' ? 'Admin' : 'Employee';
-        const user = { ...userData, role: mappedRole };
-        const token = `token_${Date.now()}`;
-        dispatch(loginSuccess({ user, token }));
-      } else {
+export const loginAsync =
+  (email: string, password: string) => async (dispatch: AppDispatch) => {
+    dispatch(loginStart());
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      if (!response.ok) {
         dispatch(loginFailure());
+        return;
       }
-    })
-    .catch((error) => {
-      console.error('Authentication error:', error);
+
+      const data = await response.json();
+
+      if (!data?.success || !data?.data) {
+        dispatch(loginFailure());
+        return;
+      }
+
+      const apiUser = data.data;
+      const mappedRole: UserRole =
+        apiUser.role === "admin" || apiUser.role === "manager"
+          ? "Admin"
+          : "Employee";
+
+      const user: User = {
+        id: apiUser._id,
+        email: apiUser.email,
+        name: apiUser.name,
+        role: mappedRole,
+        department: apiUser.department,
+        phone: apiUser.phone,
+      };
+
+      const token: string = apiUser.token;
+
+      dispatch(loginSuccess({ user, token }));
+    } catch (error) {
+      console.error("Authentication error:", error);
       dispatch(loginFailure());
-    });
-};
+    }
+  };
+
+export const logoutAsync =
+  () => async (dispatch: AppDispatch, getState: () => RootState) => {
+    const { token } = getState().auth;
+    if (token) {
+      await fetch(`${API_BASE_URL}/auth/logout`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }).catch(() => undefined);
+    }
+    dispatch(logout());
+  };
 
 export const {
   loginStart,

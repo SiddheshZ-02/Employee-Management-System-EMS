@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,14 +55,39 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
+
+interface BackendEmployee {
+  _id: string;
+  name: string;
+  email: string;
+  employeeId?: string;
+  position?: string;
+  department?: string;
+  createdAt?: string;
+  isActive?: boolean;
+}
 
 export const EmployeeManagement = () => {
   const { employees: reduxEmployees } = useAppSelector(
     (state) => state.employees
   );
   const { departments } = useAppSelector((state) => state.departments);
+  const { token } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+
+  const generateEmployeeId = () => {
+    const now = new Date();
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    const y = now.getFullYear().toString();
+    const m = pad(now.getMonth() + 1);
+    const d = pad(now.getDate());
+    const h = pad(now.getHours());
+    const min = pad(now.getMinutes());
+    const s = pad(now.getSeconds());
+    return `EMP${y}${m}${d}${h}${min}${s}`;
+  };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -75,7 +101,9 @@ export const EmployeeManagement = () => {
     password: "",
     confirmPassword: "",
     role: "",
+    employeeId: "",
     position: "",
+    phone: "",
     department: "",
     status: "Active" as "Active" | "Inactive",
   });
@@ -103,7 +131,9 @@ export const EmployeeManagement = () => {
       password: "",
       confirmPassword: "",
       role: "",
+      employeeId: "",
       position: "",
+      phone: "",
       department: "",
       status: "Active",
     });
@@ -118,28 +148,70 @@ export const EmployeeManagement = () => {
       password: "",
       confirmPassword: "",
       role: "",
+      employeeId: employee.employeeId,
       position: employee.position,
+      phone: "",
       department: employee.department,
       status: employee.status,
     });
     setIsDialogOpen(true);
   };
 
-  const fetchEmployee = async () => {
+  const handleAddClick = () => {
+    setEditingEmployee(null);
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      role: "",
+      employeeId: generateEmployeeId(),
+      position: "",
+      phone: "",
+      department: "",
+      status: "Active",
+    });
+  };
+
+  const fetchEmployee = useCallback(async () => {
+    if (!token) {
+      return;
+    }
     try {
-      const response = await fetch(BASE_URL + `/employees`, {
-        method: "GET",
-        headers: {
-          // accesstoken: "${token.access_token}", // Uncomment if token available
-        },
-      });
-      
+      const response = await fetch(
+        `${API_BASE_URL}/admin/employees?page=1&limit=100`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const res = await response.json();
-      dispatch(setEmployees(res));
+
+      const json = await response.json();
+
+      if (!json.success || !Array.isArray(json.employees)) {
+        throw new Error("Unexpected response while fetching employees");
+      }
+
+      const mapped: Employee[] = json.employees.map((emp: BackendEmployee) => ({
+        id: String(emp._id),
+        name: String(emp.name),
+        email: String(emp.email),
+        employeeId: String(emp.employeeId || ""),
+        position: String(emp.position || emp.employeeId || ""),
+        department: String(emp.department || ""),
+        joinDate: emp.createdAt
+          ? new Date(emp.createdAt).toISOString()
+          : new Date().toISOString(),
+        status: emp.isActive === false ? "Inactive" : "Active",
+      }));
+
+      dispatch(setEmployees(mapped));
     } catch (error) {
       console.error('Failed to fetch employees:', error);
       toast({
@@ -148,33 +220,68 @@ export const EmployeeManagement = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [token, dispatch]);
 
   useEffect(() => {
     fetchEmployee();
-  }, []);
+  }, [fetchEmployee]);
 
   const fetchAddEmployee = async () => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to add employees.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const payload = {
-        ...formData,
-        joinDate: new Date().toISOString().split("T")[0],
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        employeeId: formData.employeeId,
+        department: formData.department,
+        phone: formData.phone,
+        position: formData.position,
       };
-      const response = await fetch(BASE_URL + `/employees`, {
+      const response = await fetch(`${API_BASE_URL}/admin/employees`, {
         method: "POST",
         body: JSON.stringify(payload),
         headers: {
           "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData?.message || `HTTP error! status: ${response.status}`
+        );
       }
-      
-      const res = await response.json();
-      dispatch(addEmployee(res));
+
+      const json = await response.json();
+
+      if (!json.success || !json.employee) {
+        throw new Error("Unexpected response while adding employee");
+      }
+
+      const emp = json.employee;
+      const mapped: Employee = {
+        id: String(emp._id),
+        name: String(emp.name),
+        email: String(emp.email),
+        employeeId: String(emp.employeeId || ""),
+        position: String(emp.position || emp.employeeId || ""),
+        department: String(emp.department || ""),
+        joinDate: emp.createdAt
+          ? new Date(emp.createdAt).toISOString()
+          : new Date().toISOString(),
+        status: emp.isActive === false ? "Inactive" : "Active",
+      };
+
+      dispatch(addEmployee(mapped));
       fetchEmployee();
       toast({
         title: "Employee Added",
@@ -191,28 +298,77 @@ export const EmployeeManagement = () => {
     }
   };
 
-  const fetchUpdateEmployee = async (employee: Employee) => {
-    try {
-      const response = await fetch(BASE_URL + `/employees/${employee.id}`, {
-        method: "PUT",
-        body: JSON.stringify(employee),
-        headers: {
-          // accesstoken: "${token.access_token}",
-          "Content-Type": "application/json",
-        },
+  const fetchUpdateEmployee = async (payload: {
+    id: string;
+    name: string;
+    email: string;
+    employeeId: string;
+    department: string;
+    position: string;
+    status: "Active" | "Inactive";
+  }) => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to update employees.",
+        variant: "destructive",
       });
-      
+      return;
+    }
+    try {
+      const body = {
+        name: payload.name,
+        email: payload.email,
+        employeeId: payload.employeeId,
+        department: payload.department,
+        position: payload.position,
+        isActive: payload.status === "Active",
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/admin/employees/${payload.id}`,
+        {
+          method: "PUT",
+          body: JSON.stringify(body),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData?.message || `HTTP error! status: ${response.status}`
+        );
       }
-      
-      const res = await response.json();
-      dispatch(updateEmployee(res));
+
+      const json = await response.json();
+
+      if (!json.success || !json.employee) {
+        throw new Error("Unexpected response while updating employee");
+      }
+
+      const emp = json.employee;
+      const mapped: Employee = {
+        id: String(emp._id),
+        name: String(emp.name),
+        email: String(emp.email),
+        employeeId: String(emp.employeeId || ""),
+        position: String(emp.position || emp.employeeId || ""),
+        department: String(emp.department || ""),
+        joinDate: emp.createdAt
+          ? new Date(emp.createdAt).toISOString()
+          : new Date().toISOString(),
+        status: emp.isActive === false ? "Inactive" : "Active",
+      };
+
+      dispatch(updateEmployee(mapped));
       fetchEmployee();
       toast({
         title: "Employee Updated",
-        description: `${employee.name} has been updated successfully`,
+        description: `${payload.name} has been updated successfully`,
       });
     } catch (error) {
       console.error('Failed to update employee:', error);
@@ -226,22 +382,32 @@ export const EmployeeManagement = () => {
   };
 
   const fetchDeleteEmployee = async (employee: Employee) => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to delete employees.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       const response = await fetch(
-        BASE_URL + `/employees/${employee.id}`,
+        `${API_BASE_URL}/admin/employees/${employee.id}`,
         {
           method: "DELETE",
           headers: {
-            // accesstoken: "${token.access_token}",
+            Authorization: `Bearer ${token}`,
           },
         }
       );
-      
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData?.message || `HTTP error! status: ${response.status}`
+        );
       }
-      
+
       dispatch(deleteEmployee(employee.id));
       fetchEmployee();
       toast({
@@ -264,6 +430,7 @@ export const EmployeeManagement = () => {
     if (
       !formData.name ||
       !formData.email ||
+      !formData.employeeId ||
       !formData.position ||
       !formData.department
     ) {
@@ -301,16 +468,15 @@ export const EmployeeManagement = () => {
         return;
       }
       fetchAddEmployee();
-    } else {
-      // Only send editable fields for update, set joinDate to current date
+    } else if (editingEmployee) {
       const updatePayload = {
-        ...editingEmployee,
+        id: editingEmployee.id,
         name: formData.name,
         email: formData.email,
-        position: formData.position,
+        employeeId: formData.employeeId,
         department: formData.department,
+        position: formData.position,
         status: formData.status,
-        joinDate: new Date().toISOString().split("T")[0],
       };
       fetchUpdateEmployee(updatePayload);
     }
@@ -348,7 +514,7 @@ export const EmployeeManagement = () => {
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={resetForm}>
+                    <Button onClick={handleAddClick}>
                       <Plus className="h-4 w-4 mr-2" />
                       Add Employee
                     </Button>
@@ -394,6 +560,28 @@ export const EmployeeManagement = () => {
                         </div>
                         {!editingEmployee && (
                           <>
+                            <div className="grid gap-2">
+                              <Label htmlFor="employeeId">Employee ID</Label>
+                              <Input
+                                id="employeeId"
+                                value={formData.employeeId}
+                                readOnly
+                              />
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="phone">Phone Number</Label>
+                              <Input
+                                id="phone"
+                                value={formData.phone}
+                                onChange={(e) =>
+                                  setFormData({
+                                    ...formData,
+                                    phone: e.target.value,
+                                  })
+                                }
+                                placeholder="Enter phone number"
+                              />
+                            </div>
                             <div className="grid gap-2">
                               <Label htmlFor="password">Password</Label>
                               <Input
@@ -457,7 +645,7 @@ export const EmployeeManagement = () => {
                                 position: e.target.value,
                               })
                             }
-                            placeholder="e.g., Senior Developer"
+                            placeholder="Enter position"
                           />
                         </div>
                         <div className="grid gap-2">
@@ -583,6 +771,14 @@ export const EmployeeManagement = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => navigate(`/admin/employees/${employee.id}`)}
+                              className="h-8 px-2"
+                            >
+                              View
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"

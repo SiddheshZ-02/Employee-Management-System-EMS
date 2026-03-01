@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -37,13 +37,7 @@ import {
 } from "@/components/ui/table";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
-import {
-  addDepartment,
-  updateDepartment,
-  deleteDepartment,
-  setDepartments,
-  type Department,
-} from "@/store/slices/departmentSlice";
+import { deleteDepartment, setDepartments, type Department } from "@/store/slices/departmentSlice";
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { Plus, Edit, Trash2, Search, Building2, Users } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
@@ -56,47 +50,131 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
+
+interface BackendDepartment {
+  _id: string;
+  name: string;
+  description: string;
+  manager: string;
+  employeeCount?: number;
+  status?: string;
+}
+
+interface BackendEmployee {
+  _id: string;
+  name: string;
+  email: string;
+  employeeId?: string;
+  position?: string;
+  department?: string;
+  createdAt?: string;
+  isActive?: boolean;
+}
 
 export const DepartmentManagement = () => {
   const { departments } = useAppSelector((state) => state.departments);
   const { employees } = useAppSelector((state) => state.employees);
+  const { token } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
 
-  // Fetch departments from API and sync Redux
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+
     try {
-      const response = await fetch(BASE_URL + `/departments`);
-      const data = await response.json();
-      dispatch(setDepartments(data));
-    } catch (error) {
+      const response = await fetch(`${API_BASE_URL}/admin/departments`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        toast({
+          title: "Error",
+          description: "Failed to fetch departments",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const json = await response.json();
+
+      if (!json.success || !Array.isArray(json.departments)) {
+        toast({
+          title: "Error",
+          description: "Unexpected response while fetching departments",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const mapped = json.departments.map((dept: BackendDepartment) => ({
+        id: String(dept._id),
+        name: String(dept.name),
+        description: String(dept.description),
+        manager: String(dept.manager),
+        employeeCount: typeof dept.employeeCount === "number" ? dept.employeeCount : 0,
+        status: dept.status === "Inactive" ? "Inactive" : "Active",
+      }));
+
+      dispatch(setDepartments(mapped));
+    } catch {
       toast({
         title: "Error",
         description: "Failed to fetch departments",
         variant: "destructive",
       });
     }
-  };
+  }, [token, dispatch]);
 
-  // Fetch employees from API and sync Redux
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
+    if (!token) {
+      return;
+    }
     try {
-      const response = await fetch(BASE_URL + `/employees`);
-      const data = await response.json();
-      dispatch(setEmployees(data));
-    } catch (error) {
+      const response = await fetch(
+        `${API_BASE_URL}/admin/employees?page=1&limit=100`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const json = await response.json();
+      if (!json.success || !Array.isArray(json.employees)) {
+        throw new Error("Unexpected response while fetching employees");
+      }
+      const mapped = json.employees.map((emp: BackendEmployee) => ({
+        id: String(emp._id),
+        name: String(emp.name),
+        email: String(emp.email),
+        employeeId: String(emp.employeeId || ""),
+        position: String(emp.position || emp.employeeId || ""),
+        department: String(emp.department || ""),
+        joinDate: emp.createdAt
+          ? new Date(emp.createdAt).toISOString()
+          : new Date().toISOString(),
+        status: emp.isActive === false ? "Inactive" : "Active",
+      }));
+      dispatch(setEmployees(mapped));
+    } catch {
       toast({
         title: "Error",
         description: "Failed to fetch employees",
         variant: "destructive",
       });
     }
-  };
+  }, [token, dispatch]);
 
   useEffect(() => {
     fetchDepartments();
     fetchEmployees();
-  }, []);
+  }, [fetchDepartments, fetchEmployees]);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingDepartment, setEditingDepartment] = useState<Department | null>(
@@ -155,40 +233,57 @@ export const DepartmentManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.description || !formData.manager) {
+    if (!formData.name || !formData.description) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in department name and description",
         variant: "destructive",
       });
       return;
     }
-    const employeeCount = employees.filter(
-      (emp) => emp.department === formData.name
-    ).length;
     if (editingDepartment) {
-      // Update department via API
       try {
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "You are not authenticated",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const response = await fetch(
-          BASE_URL + `/departments/${editingDepartment.id}`,
+          `${API_BASE_URL}/admin/departments/${editingDepartment.id}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
             body: JSON.stringify({
-              ...editingDepartment,
-              ...formData,
-              employeeCount,
+              name: formData.name,
+              description: formData.description,
+              manager: formData.manager,
+              status: formData.status,
             }),
           }
         );
-        const updated = await response.json();
-        dispatch(updateDepartment(updated));
+
+        if (!response.ok) {
+          toast({
+            title: "Error",
+            description: "Failed to update department",
+            variant: "destructive",
+          });
+          return;
+        }
+
         fetchDepartments();
         toast({
           title: "Department Updated",
           description: `${formData.name} has been updated successfully`,
         });
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
           description: "Failed to update department",
@@ -196,24 +291,48 @@ export const DepartmentManagement = () => {
         });
       }
     } else {
-      // Add department via API
       try {
+        if (!token) {
+          toast({
+            title: "Error",
+            description: "You are not authenticated",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const response = await fetch(
-          BASE_URL + `/departments`,
+          `${API_BASE_URL}/admin/departments`,
           {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...formData, employeeCount }),
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              name: formData.name,
+              description: formData.description,
+              manager: formData.manager,
+              status: formData.status,
+            }),
           }
         );
-        const added = await response.json();
-        dispatch(addDepartment(added));
+
+        if (!response.ok) {
+          toast({
+            title: "Error",
+            description: "Failed to add department",
+            variant: "destructive",
+          });
+          return;
+        }
+
         fetchDepartments();
         toast({
           title: "Department Added",
           description: `${formData.name} has been created successfully`,
         });
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
           description: "Failed to add department",
@@ -227,9 +346,39 @@ export const DepartmentManagement = () => {
 
   const handleDelete = async (department: Department) => {
     try {
-      await fetch(BASE_URL + `/departments/${department.id}`, {
-        method: "DELETE",
-      });
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "You are not authenticated",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/admin/departments/${department.id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const message =
+          response.status === 409
+            ? "Department has assigned employees and cannot be deleted"
+            : "Failed to delete department";
+
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        });
+        return;
+      }
+
       dispatch(deleteDepartment(department.id));
       fetchDepartments();
       toast({
@@ -260,42 +409,7 @@ export const DepartmentManagement = () => {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Departments
-                </CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{departments.length}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  Total Employees
-                </CardTitle>
-                <Users className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{employees.length}</div>
-              </CardContent>
-            </Card>
-            {/* <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Budget</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              ${(departments.reduce((sum, dept) => sum + dept.budget, 0) / 1000000).toFixed(1)}M
-            </div>
-          </CardContent>
-        </Card> */}
-          </div>
+          
 
           <Card>
             <CardHeader>

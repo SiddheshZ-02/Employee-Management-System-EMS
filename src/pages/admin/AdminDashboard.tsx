@@ -5,24 +5,51 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  AttendanceTrendChart,
-  DepartmentDistributionChart,
-  WeeklyAttendanceChart,
-  LiveStatsCard,
-} from "@/components/ui/charts";
+import { Suspense, lazy } from "react";
+import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import {
-  
-  Building2,
-  UserCheck,
-  Calendar,
-} from "lucide-react";
+import { Building2, UserCheck, Calendar } from "lucide-react";
 import { useEffect } from "react";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { setDepartments } from "@/store/slices/departmentSlice";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
+
+const AttendanceTrendChartLazy = lazy(() =>
+  import("@/components/ui/charts").then((m) => ({
+    default: m.AttendanceTrendChart,
+  }))
+);
+const DepartmentDistributionChartLazy = lazy(() =>
+  import("@/components/ui/charts").then((m) => ({
+    default: m.DepartmentDistributionChart,
+  }))
+);
+const WeeklyAttendanceChartLazy = lazy(() =>
+  import("@/components/ui/charts").then((m) => ({
+    default: m.WeeklyAttendanceChart,
+  }))
+);
+
+interface BackendEmployee {
+  _id: string;
+  name: string;
+  email: string;
+  employeeId?: string;
+  position?: string;
+  department?: string;
+  createdAt?: string;
+  isActive?: boolean;
+}
+
+interface BackendDepartment {
+  _id: string;
+  name: string;
+  description: string;
+  manager: string;
+  employeeCount?: number;
+  status?: string;
+}
 
 // interface StatCardProps {
 //   title: string;
@@ -69,18 +96,72 @@ export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
   const { employees } = useAppSelector((state) => state.employees);
   const { departments } = useAppSelector((state) => state.departments);
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
-    // Fetch employees
-    fetch(BASE_URL + `/employees`)
-      .then((res) => res.json())
-      .then((data) => dispatch(setEmployees(data)));
-    // Fetch departments
-    fetch(BASE_URL + `/departments`)
-      .then((res) => res.json())
-      .then((data) => dispatch(setDepartments(data)));
-  }, [dispatch]);
+    if (!token) {
+      return;
+    }
+    const fetchData = async () => {
+      try {
+        const [employeesRes, departmentsRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/admin/employees?page=1&limit=100`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/admin/departments?page=1&limit=100`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (employeesRes.ok) {
+          const employeesJson = await employeesRes.json();
+          if (employeesJson.success && Array.isArray(employeesJson.employees)) {
+            const mappedEmployees = employeesJson.employees.map(
+              (emp: BackendEmployee) => ({
+                id: String(emp._id),
+                name: String(emp.name),
+                email: String(emp.email),
+                employeeId: String(emp.employeeId || ""),
+                position: String(emp.position || emp.employeeId || ""),
+                department: String(emp.department || ""),
+                joinDate: emp.createdAt
+                  ? new Date(emp.createdAt).toISOString()
+                  : new Date().toISOString(),
+                status: emp.isActive === false ? "Inactive" : "Active",
+              })
+            );
+            dispatch(setEmployees(mappedEmployees));
+          }
+        }
+
+        if (departmentsRes.ok) {
+          const departmentsJson = await departmentsRes.json();
+          if (
+            departmentsJson.success &&
+            Array.isArray(departmentsJson.departments)
+          ) {
+            const mappedDepartments = departmentsJson.departments.map(
+              (dept: BackendDepartment) => ({
+                id: String(dept._id),
+                name: String(dept.name),
+                description: String(dept.description),
+                manager: String(dept.manager),
+                employeeCount:
+                  typeof dept.employeeCount === "number"
+                    ? dept.employeeCount
+                    : 0,
+                status: dept.status === "Inactive" ? "Inactive" : "Active",
+              })
+            );
+            dispatch(setDepartments(mappedDepartments));
+          }
+        }
+      } catch {
+        return;
+      }
+    };
+    fetchData();
+  }, [dispatch, token]);
 
   // const activeEmployees = employees.filter(
   //   (emp) => emp.status === "Active"
@@ -220,14 +301,14 @@ export const AdminDashboard = () => {
                       style={{ animationDelay: `${index * 100}ms` }}
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
-                          <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full bg-primary shrink-0"></div>
+                        <div className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
+                          <span className="inline-block w-1 h-1 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full bg-primary shrink-0"></span>
                           <span className="truncate">
                             {dept.name.length > 20
                               ? dept.name.substring(0, 20) + "..."
                               : dept.name}
                           </span>
-                        </p>
+                        </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {dept.employeeCount} emp
                           <span className="hidden sm:inline">loyees</span>
@@ -266,16 +347,61 @@ export const AdminDashboard = () => {
 
             <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 xl:grid-cols-2">
               <div className="w-full min-w-0">
-                <AttendanceTrendChart />
+                <Suspense
+                  fallback={
+                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
+                      <CardHeader>
+                        <CardTitle className="text-sm sm:text-base">
+                          Loading attendance trends...
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
+                      </CardContent>
+                    </Card>
+                  }
+                >
+                  <AttendanceTrendChartLazy />
+                </Suspense>
               </div>
               <div className="w-full min-w-0">
-                <DepartmentDistributionChart />
+                <Suspense
+                  fallback={
+                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
+                      <CardHeader>
+                        <CardTitle className="text-sm sm:text-base">
+                          Loading department distribution...
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
+                      </CardContent>
+                    </Card>
+                  }
+                >
+                  <DepartmentDistributionChartLazy />
+                </Suspense>
               </div>
             </div>
 
             <div className="grid gap-3 sm:gap-4 md:gap-6">
               <div className="w-full min-w-0">
-                <WeeklyAttendanceChart />
+                <Suspense
+                  fallback={
+                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
+                      <CardHeader>
+                        <CardTitle className="text-sm sm:text-base">
+                          Loading weekly attendance...
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
+                      </CardContent>
+                    </Card>
+                  }
+                >
+                  <WeeklyAttendanceChartLazy />
+                </Suspense>
               </div>
             </div>
           </div>

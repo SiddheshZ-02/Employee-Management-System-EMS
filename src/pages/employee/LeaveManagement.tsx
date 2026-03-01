@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { type LeaveRequest } from "@/store/slices/leaveSlice";
 import {
@@ -47,17 +47,17 @@ import { useForm } from "react-hook-form";
 import { Calendar, Plus, X, CalendarDays, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
 
 interface LeaveFormData {
-  type: "Vacation" | "Sick" | "Personal" | "Maternity" | "Paternity";
+  type: "vacation" | "sick" | "casual" | "other";
   startDate: string;
   endDate: string;
   reason: string;
 }
 
 const LeaveManagement = () => {
-  const { user } = useAppSelector((state) => state.auth);
+  const { user, token } = useAppSelector((state) => state.auth);
   const { balances } = useAppSelector((state) => state.leave);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -65,33 +65,106 @@ const LeaveManagement = () => {
 
   const form = useForm<LeaveFormData>({
     defaultValues: {
-      type: "Vacation",
+      type: "vacation",
       startDate: "",
       endDate: "",
       reason: "",
     },
   });
 
-  // Fetch leave requests from API
-  const fetchLeave = async () => {
+  const fetchLeave = useCallback(async () => {
     try {
-      const response = await fetch(BASE_URL + `/leaves`, {
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/leave/my-requests`, {
         method: "GET",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       });
-      const res = await response.json();
-      setLeave(res);
-    } catch (error) {
-      console.error("Error fetching leave data:", error);
+
+      if (!response.ok) {
+        return;
+      }
+
+      const res = (await response.json()) as {
+        success: boolean;
+        leaveRequests: {
+          _id: string;
+          userId: string;
+          startDate: string;
+          endDate: string;
+          totalDays?: number;
+          reason: string;
+          leaveType: string;
+          status: string;
+          createdAt?: string;
+          approvedBy?: {
+            name?: string;
+            email?: string;
+          } | null;
+        }[];
+      };
+
+      if (!res.success || !Array.isArray(res.leaveRequests)) {
+        return;
+      }
+
+      const mapped: LeaveRequest[] = res.leaveRequests.map((r) => ({
+
+        id: r._id,
+        employeeId: r.userId,
+        employeeName: user?.name || "",
+        type:
+          r.leaveType === "vacation"
+            ? "Vacation"
+            : r.leaveType === "sick"
+            ? "Sick"
+            : r.leaveType === "casual"
+            ? "Casual"
+            : "Other",
+        startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
+        endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
+        days: r.totalDays || 0,
+        reason: r.reason,
+        status:
+          r.status === "approved"
+            ? "Approved"
+            : r.status === "rejected"
+            ? "Rejected"
+            : r.status === "cancelled"
+            ? "Rejected"
+            : "Pending",
+        submittedAt: r.createdAt || "",
+        approvedByName: r.approvedBy?.name || "",
+        approvedByEmail: r.approvedBy?.email || "",
+      }));
+
+      setLeave(mapped);
+    } catch {
+      console.error(
+        "Error fetching leave data:",
+        new Error("Failed to fetch leave data")
+      );
     }
-  };
+  }, [token, user?.name]);
 
   useEffect(() => {
     fetchLeave();
-  }, []);
+  }, [fetchLeave]);
 
   // Submit leave request to API
   const onSubmit = async (data: LeaveFormData) => {
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to submit a leave request.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const startDate = new Date(data.startDate);
     const endDate = new Date(data.endDate);
     const days =
@@ -99,23 +172,21 @@ const LeaveManagement = () => {
         (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
       ) + 1;
 
-    const newRequest = {
-      employeeId: user?.id || "",
-      employeeName: user?.name || "",
-      type: data.type,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      days,
-      reason: data.reason,
-      status: "Pending",
-      submittedAt: new Date().toISOString(),
-    };
-
     try {
-      const response = await fetch(BASE_URL + `/leaves`, {
+      const leaveType = data.type;
+
+      const response = await fetch(`${API_BASE_URL}/leave/request`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newRequest),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          startDate: data.startDate,
+          endDate: data.endDate,
+          reason: data.reason,
+          leaveType,
+        }),
       });
       if (response.ok) {
         toast({
@@ -128,7 +199,7 @@ const LeaveManagement = () => {
       } else {
         toast({ title: "Failed to submit leave request" });
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Error submitting leave request" });
     }
   };
@@ -136,10 +207,13 @@ const LeaveManagement = () => {
   const handleCancel = async (requestId: string) => {
     try {
       const response = await fetch(
-        BASE_URL + `/leaves/${requestId}`,
+        `${API_BASE_URL}/leave/request/${requestId}`,
         {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: token ? `Bearer ${token}` : "",
+          },
         }
       );
       if (response.ok) {
@@ -151,7 +225,7 @@ const LeaveManagement = () => {
       } else {
         toast({ title: "Failed to cancel leave request" });
       }
-    } catch (error) {
+    } catch {
       toast({ title: "Error cancelling leave request" });
     }
   };
@@ -175,16 +249,19 @@ const LeaveManagement = () => {
         return "text-blue-600";
       case "Sick":
         return "text-red-600";
-      case "Personal":
+      case "Casual":
         return "text-green-600";
-      case "Maternity":
+      case "Other":
         return "text-purple-600";
-      case "Paternity":
-        return "text-indigo-600";
       default:
         return "text-gray-600";
     }
   };
+
+  const pendingLeave = leave.filter((r) => r.status === "Pending");
+  const approvedLeave = leave.filter((r) => r.status === "Approved");
+  const [activeTab, setActiveTab] = useState<"Pending" | "Approved">("Pending");
+  const activeList = activeTab === "Pending" ? pendingLeave : approvedLeave;
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -238,15 +315,10 @@ const LeaveManagement = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="Vacation">Vacation</SelectItem>
-                              <SelectItem value="Sick">Sick Leave</SelectItem>
-                              <SelectItem value="Personal">Personal</SelectItem>
-                              <SelectItem value="Maternity">
-                                Maternity
-                              </SelectItem>
-                              <SelectItem value="Paternity">
-                                Paternity
-                              </SelectItem>
+                              <SelectItem value="vacation">Vacation</SelectItem>
+                              <SelectItem value="sick">Sick Leave</SelectItem>
+                              <SelectItem value="casual">Casual</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -366,117 +438,138 @@ const LeaveManagement = () => {
           {/* Leave Requests */}
           <Card className="hover-lift transition-smooth border-border/50">
             <CardHeader>
-              <CardTitle>My Leave Requests</CardTitle>
-              <CardDescription>
-                Track the status of your submitted leave requests.
-              </CardDescription>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <CardTitle>My Leave Requests</CardTitle>
+                  <CardDescription>
+                    View your pending and approved leave requests.
+                  </CardDescription>
+                </div>
+                <div className="inline-flex items-center rounded-md border border-border/60 p-1 bg-background">
+                  <Button
+                    type="button"
+                    variant={activeTab === "Pending" ? "default" : "ghost"}
+                    size="sm"
+                    className="px-3"
+                    onClick={() => setActiveTab("Pending")}
+                  >
+                    Pending
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={activeTab === "Approved" ? "default" : "ghost"}
+                    size="sm"
+                    className="px-3"
+                    onClick={() => setActiveTab("Approved")}
+                  >
+                    Approved
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
-              {leave.length > 0 ? (
+              {activeList.length > 0 ? (
                 <div className="rounded-lg border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="whitespace-nowrap">Type</TableHead>
+                        <TableHead className="whitespace-nowrap">Dates</TableHead>
+                        <TableHead className="whitespace-nowrap">Days</TableHead>
+                        <TableHead className="whitespace-nowrap">Status</TableHead>
                         <TableHead className="whitespace-nowrap">
-                          Type
+                          {activeTab === "Pending" ? "Submitted" : "Approved On"}
                         </TableHead>
-                        <TableHead className="whitespace-nowrap">
-                          Dates
-                        </TableHead>
-                        <TableHead className="whitespace-nowrap">
-                          Days
-                        </TableHead>
-                        <TableHead className="whitespace-nowrap">
-                          Status
-                        </TableHead>
-                        <TableHead className="whitespace-nowrap">
-                          Submitted
-                        </TableHead>
-                        <TableHead className="text-right whitespace-nowrap">
-                          Actions
-                        </TableHead>
+                        {activeTab === "Approved" && (
+                          <TableHead className="whitespace-nowrap">
+                            Approved By
+                          </TableHead>
+                        )}
+                        {activeTab === "Pending" && (
+                          <TableHead className="text-right whitespace-nowrap">
+                            Actions
+                          </TableHead>
+                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {leave.map((request) => (
-                        <TableRow key={request.id}>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <CalendarDays
-                                className={`h-4 w-4 ${getTypeColor(
-                                  request.type
-                                )} shrink-0`}
-                              />
-                              <span className="font-medium text-foreground truncate">
-                                {request.type}
+                      {activeList.map((request) => (
+                          <TableRow key={request.id}>
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <CalendarDays
+                                  className={`h-4 w-4 ${getTypeColor(
+                                    request.type
+                                  )} shrink-0`}
+                                />
+                                <span className="font-medium text-foreground truncate">
+                                  {request.type}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div className="truncate">
+                                  {request.startDate} -
+                                </div>
+                                <div className="text-muted-foreground truncate">
+                                  {request.endDate}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-medium text-foreground">
+                                {request.days}
                               </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-sm">
-                              <div className="truncate">
-                                {request.startDate} -
-                              </div>
-                              <div className="text-muted-foreground truncate">
-                                {request.endDate}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-medium text-foreground">
-                              {request.days}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={getStatusBadgeVariant(request.status)}
-                            >
-                              {request.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-muted-foreground whitespace-nowrap">
-                              {request.submittedAt &&
-                              !isNaN(new Date(request.submittedAt).getTime())
-                                ? format(
-                                    new Date(request.submittedAt),
-                                    "dd/MM/yyyy"
-                                  )
-                                : "N/A"}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {request.status === "Pending" && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleCancel(request.id)}
-                                className="text-red-600 hover:text-red-700"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusBadgeVariant(request.status)}>
+                                {request.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                                {request.submittedAt &&
+                                !isNaN(new Date(request.submittedAt).getTime())
+                                  ? format(
+                                      new Date(request.submittedAt),
+                                      "dd/MM/yyyy"
+                                    )
+                                  : "N/A"}
+                              </span>
+                            </TableCell>
+                            {activeTab === "Approved" && (
+                              <TableCell>
+                                <span className="text-sm text-muted-foreground truncate">
+                                  {request.approvedByName || "N/A"}
+                                </span>
+                              </TableCell>
                             )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            {activeTab === "Pending" && (
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleCancel(request.id)}
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            )}
+                          </TableRow>
+                        )
+                      )}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="text-center space-y-6 py-12">
-                  <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2">
-                      No leave requests
-                    </h3>
-                    <p className="text-muted-foreground mb-4">
-                      You haven't submitted any leave requests yet.
-                    </p>
-                    <Button onClick={() => setDialogOpen(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Request Leave
-                    </Button>
-                  </div>
+                <div className="text-center space-y-4 py-8 text-sm text-muted-foreground">
+                  <p>
+                    {activeTab === "Pending"
+                      ? "No pending leave requests."
+                      : "No approved leave requests yet."}
+                  </p>
                 </div>
               )}
             </CardContent>

@@ -11,6 +11,8 @@ export interface LeaveRequest {
   reason: string;
   status: 'Pending' | 'Approved' | 'Rejected';
   submittedAt: string;
+  approvedByName?: string;
+  approvedByEmail?: string;
 }
 
 interface LeaveBalance {

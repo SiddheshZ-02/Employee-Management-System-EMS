@@ -8,23 +8,82 @@ import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { updateProfile } from '@/store/slices/authSlice';
 import { toast } from '@/hooks/use-toast';
 import { User, Save } from 'lucide-react';
+import { API_BASE_URL } from '@/constant/Config';
 
 export const ProfileManagement = () => {
-  const { user } = useAppSelector(state => state.auth);
+  const { user, token } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const [formData, setFormData] = useState({
     name: user?.name || '',
     email: user?.email || '',
     department: user?.department || '',
+    phone: user?.phone || '',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    dispatch(updateProfile(formData));
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been successfully updated",
-    });
+
+    if (!token) {
+      toast({
+        title: "Not authenticated",
+        description: "Please log in again to update your profile",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          department: formData.department,
+          phone: formData.phone,
+        }),
+      });
+
+      if (!response.ok) {
+        toast({
+          title: "Update failed",
+          description: "Unable to update profile. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data?.success && data?.data) {
+        dispatch(
+          updateProfile({
+            name: data.data.name,
+            email: data.data.email,
+            department: data.data.department,
+            phone: data.data.phone,
+          })
+        );
+        toast({
+          title: "Profile Updated",
+          description: "Your profile has been successfully updated",
+        });
+      } else {
+        toast({
+          title: "Update failed",
+          description: "Unexpected response from server",
+          variant: "destructive",
+        });
+      }
+    } catch {
+      toast({
+        title: "Update failed",
+        description: "An error occurred while updating your profile",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -62,7 +121,7 @@ export const ProfileManagement = () => {
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    disabled
                     className="w-full touch-target"
                   />
                 </div>
@@ -78,6 +137,18 @@ export const ProfileManagement = () => {
                     className="w-full touch-target"
                   />
                 </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    className="w-full touch-target"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="grid gap-2">
                   <Label htmlFor="role" className="text-sm font-medium">Role</Label>
                   <Input id="role" value={user?.role || ''} disabled className="w-full bg-muted touch-target" />

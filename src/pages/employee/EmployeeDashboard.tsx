@@ -1,12 +1,78 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { Clock, Calendar, User, CheckCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { API_BASE_URL } from '@/constant/Config';
 
 export const EmployeeDashboard = () => {
-  const { user } = useAppSelector(state => state.auth);
+  const { user, token } = useAppSelector(state => state.auth);
   const navigate = useNavigate();
+  const [hoursToday, setHoursToday] = useState('0h 0m');
+  const [leaveBalance, setLeaveBalance] = useState(0);
+  const [monthAttendance, setMonthAttendance] = useState<{ attended: number; totalDays: number }>({
+    attended: 0,
+    totalDays: 0,
+  });
+
+  useEffect(() => {
+    if (!token) {
+      return;
+    }
+    const loadData = async () => {
+      try {
+        const [todayRes, historyRes, leaveRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/attendance/today`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/attendance/history?period=month`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/leave/my-requests`, {
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          }),
+        ]);
+
+        if (todayRes.ok) {
+          const todayJson = await todayRes.json();
+          if (todayJson.success && todayJson.stats && todayJson.stats.totalHours) {
+            setHoursToday(todayJson.stats.totalHours);
+          } else {
+            setHoursToday('0h 0m');
+          }
+        }
+
+        if (historyRes.ok) {
+          const historyJson = await historyRes.json();
+          if (historyJson.success && historyJson.statistics) {
+            const attended = historyJson.statistics.totalDays || 0;
+            const now = new Date();
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            const totalDays =
+              Math.round(
+                (endOfMonth.getTime() - startOfMonth.getTime()) / (1000 * 60 * 60 * 24)
+              ) + 1;
+            setMonthAttendance({ attended, totalDays });
+          }
+        }
+
+        if (leaveRes.ok) {
+          const leaveJson = await leaveRes.json();
+          if (leaveJson.success && leaveJson.summary) {
+            const approvedDays = leaveJson.summary.totalApprovedDays || 0;
+            const totalAllowance = 24;
+            const remaining = totalAllowance - approvedDays;
+            setLeaveBalance(remaining > 0 ? remaining : 0);
+          }
+        }
+      } catch {
+        return;
+      }
+    };
+    loadData();
+  }, [token]);
   
   return (
     <div className="w-full min-h-full bg-background">
@@ -48,7 +114,7 @@ export const EmployeeDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">8.5</div>
+              <div className="text-2xl font-bold text-blue-600">{hoursToday}</div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
                 <span className="truncate">Normal schedule</span>
@@ -66,7 +132,7 @@ export const EmployeeDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">12</div>
+              <div className="text-2xl font-bold text-green-600">{leaveBalance}</div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
                 <span className="truncate">Days remaining</span>
@@ -84,7 +150,9 @@ export const EmployeeDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-purple-600">22/23</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {monthAttendance.attended}/{monthAttendance.totalDays}
+              </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <span className="w-2 h-2 rounded-full bg-purple-500 shrink-0"></span>
                 <span className="truncate">Days attended</span>

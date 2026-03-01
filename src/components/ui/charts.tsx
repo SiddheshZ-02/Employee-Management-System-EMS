@@ -30,7 +30,8 @@ import {
   BarChart3,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BASE_URL } from "@/constant/Config";
+import {  API_BASE_URL } from "@/constant/Config";
+import { useAppSelector } from "@/hooks/useAppSelector";
 
 // Types for real data
 interface AttendanceRecord {
@@ -56,15 +57,6 @@ interface Department {
   status: string;
 }
 
-interface LeaveRequest {
-  id: string;
-  employeeId: string;
-  type: string;
-  startDate: string;
-  endDate: string;
-  status: string;
-}
-
 // Enhanced AttendanceTrendChart with real data
 export const AttendanceTrendChart = () => {
   const [attendanceData, setAttendanceData] = useState<any[]>([]);
@@ -76,8 +68,8 @@ export const AttendanceTrendChart = () => {
       try {
         setLoading(true);
         const [attendanceRes, employeeRes] = await Promise.all([
-          fetch(BASE_URL + `/attendance`),
-          fetch(BASE_URL + `/employees`),
+          fetch(API_BASE_URL + `/attendance`),
+          fetch(API_BASE_URL + `/employees`),
         ]);
 
         const attendance: AttendanceRecord[] = await attendanceRes.json();
@@ -310,8 +302,8 @@ export const DepartmentDistributionChart = () => {
       try {
         setLoading(true);
         const [employeeRes, departmentRes] = await Promise.all([
-          fetch(BASE_URL + `/employees`),
-          fetch(BASE_URL + `/departments`),
+          fetch(API_BASE_URL + `/employees`),
+          fetch(API_BASE_URL + `/departments`),
         ]);
 
         const employees: Employee[] = await employeeRes.json();
@@ -462,8 +454,8 @@ export const WeeklyAttendanceChart = () => {
       try {
         setLoading(true);
         const [attendanceRes, employeeRes] = await Promise.all([
-          fetch(BASE_URL + `/attendance`),
-          fetch(BASE_URL + `/employees`),
+          fetch(API_BASE_URL + `/attendance`),
+          fetch(API_BASE_URL + `/employees`),
         ]);
 
         const attendance: AttendanceRecord[] = await attendanceRes.json();
@@ -629,68 +621,70 @@ export const LiveStatsCard = () => {
   const [stats, setStats] = useState({
     totalEmployees: 0,
     presentToday: 0,
-    onLeave: 0,
+    pendingLeaves: 0,
     averageHours: 0,
   });
   const [loading, setLoading] = useState(true);
+  const { token } = useAppSelector((state) => state.auth);
 
   useEffect(() => {
     const fetchLiveStats = async () => {
       try {
-        const [employeeRes, attendanceRes, leaveRes] = await Promise.all([
-          fetch(BASE_URL + `/employees`),
-          fetch(BASE_URL + `/attendance`),
-          fetch(BASE_URL + `/leaves`),
-        ]);
+        if (!token) {
+          setLoading(false);
+          return;
+        }
 
-        const employees: Employee[] = await employeeRes.json();
-        const attendance: AttendanceRecord[] = await attendanceRes.json();
-        const leaves: LeaveRequest[] = await leaveRes.json();
-
-        const today = new Date().toISOString().split("T")[0];
-        const activeEmployees = employees.filter(
-          (emp) => emp.status === "Active"
-        );
-
-        const todayAttendance = attendance.filter(
-          (record) => record.date === today && record.time_in
-        );
-
-        const activeLeavesToday = leaves.filter((leave) => {
-          const startDate = new Date(leave.startDate);
-          const endDate = new Date(leave.endDate);
-          const todayDate = new Date(today);
-          return (
-            leave.status === "Approved" &&
-            todayDate >= startDate &&
-            todayDate <= endDate
-          );
+        const res = await fetch(`${API_BASE_URL}/admin/statistics`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         });
 
-        // Calculate average working hours from completed attendance
-        const completedAttendance = attendance.filter(
-          (record) => record.time_out && record.workinghours > 0
-        );
-        const avgHours =
-          completedAttendance.length > 0
-            ? Math.round(
-                (completedAttendance.reduce(
-                  (sum, record) =>
-                    sum +
-                    record.workinghours +
-                    (record.workingminutes || 0) / 60,
-                  0
-                ) /
-                  completedAttendance.length) *
-                  10
-              ) / 10
-            : 0;
+        if (!res.ok) {
+          setLoading(false);
+          return;
+        }
+
+        const data: {
+          success?: boolean;
+          today?: {
+            totalEmployees?: number;
+            present?: number;
+          };
+          thisMonth?: {
+            avgHoursPerDay?: string;
+          };
+          leaves?: {
+            pending?: number;
+          };
+        } = await res.json();
+
+        if (!data.success || !data.today || !data.thisMonth || !data.leaves) {
+          setLoading(false);
+          return;
+        }
+
+        const totalEmployees = data.today.totalEmployees ?? 0;
+        const presentToday = data.today.present ?? 0;
+        const pendingLeaves = data.leaves.pending ?? 0;
+
+        let averageHours = 0;
+        const label = data.thisMonth.avgHoursPerDay;
+        if (label) {
+          const match = label.match(/(\d+)h\s+(\d+)m/);
+          if (match) {
+            const hours = parseInt(match[1], 10);
+            const minutes = parseInt(match[2], 10) || 0;
+            averageHours = Math.round((hours + minutes / 60) * 10) / 10;
+          }
+        }
 
         setStats({
-          totalEmployees: activeEmployees.length,
-          presentToday: todayAttendance.length,
-          onLeave: activeLeavesToday.length,
-          averageHours: avgHours,
+          totalEmployees,
+          presentToday,
+          pendingLeaves,
+          averageHours,
         });
       } catch (error) {
         console.error("Error fetching live stats:", error);
@@ -703,7 +697,7 @@ export const LiveStatsCard = () => {
     // Refresh every 30 seconds
     const interval = setInterval(fetchLiveStats, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [token]);
 
   if (loading) {
     return (
@@ -744,9 +738,9 @@ export const LiveStatsCard = () => {
       textColor: "text-green-600",
     },
     {
-      title: "On Leave",
-      value: stats.onLeave,
-      suffix: "employees",
+      title: "Pending Leave",
+      value: stats.pendingLeaves,
+      suffix: "requests",
       icon: Calendar,
       color: "bg-orange-500",
       textColor: "text-orange-600",

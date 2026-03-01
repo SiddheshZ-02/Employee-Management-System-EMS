@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
@@ -21,13 +22,14 @@ import {
   Calendar, 
   User,
   LogOut,
-
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { logout } from '@/store/slices/authSlice';
+import { logoutAsync } from '@/store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { API_BASE_URL } from '@/constant/Config';
 
 const adminNavItems = [
   {
@@ -49,6 +51,26 @@ const adminNavItems = [
     title: 'Admin Management',
     url: '/admin/users',
     icon: UserCog,
+  },
+  {
+    title: 'Leave Requests',
+    url: '/admin/leave-requests',
+    icon: ClipboardList,
+  },
+  {
+    title: 'Attendance',
+    url: '/admin/attendance',
+    icon: Clock,
+  },
+  {
+    title: 'Office Location',
+    url: '/admin/office-location',
+    icon: Building2,
+  },
+  {
+    title: 'Admin Access',
+    url: '/admin/weekoff',
+    icon: Calendar,
   },
 ];
 
@@ -80,17 +102,70 @@ export function AppSidebar() {
   const collapsed = state === 'collapsed';
   // const location = useLocation();
   // const currentPath = location.pathname;
-  const { user } = useAppSelector(state => state.auth);
+  const { user, token } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+
+  const [pendingLeaves, setPendingLeaves] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!token || user?.role !== 'Admin') {
+      setPendingLeaves(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchPendingLeaves = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/admin/statistics`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          if (!cancelled) {
+            setPendingLeaves(null);
+          }
+          return;
+        }
+
+        const data: {
+          success?: boolean;
+          leaves?: { pending?: number };
+        } = await res.json();
+
+        if (!cancelled) {
+          if (data.success && data.leaves && typeof data.leaves.pending === 'number') {
+            setPendingLeaves(data.leaves.pending);
+          } else {
+            setPendingLeaves(null);
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setPendingLeaves(null);
+        }
+      }
+    };
+
+    fetchPendingLeaves();
+    const interval = setInterval(fetchPendingLeaves, 60000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [token, user?.role]);
 
   const navItems = user?.role === 'Admin' ? adminNavItems : employeeNavItems;
   // const isActived = (path: string) => currentPath === path;
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`;
 
-  const handleLogout = () => {
-    dispatch(logout());
+  const handleLogout = async () => {
+    await dispatch(logoutAsync());
     navigate('/auth');
   };
 
@@ -122,16 +197,31 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink to={item.url} className={getNavClass}>
-                      <item.icon className="h-4 w-4 flex-shrink-0" />
-                      {!collapsed && <span className="truncate">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {navItems.map((item) => {
+                const isLeaveRequests = item.title === 'Leave Requests';
+                const showBadge =
+                  isLeaveRequests && pendingLeaves !== null && pendingLeaves > 0;
+
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <NavLink to={item.url} className={getNavClass}>
+                        <item.icon className="h-4 w-4 flex-shrink-0" />
+                        {!collapsed && (
+                          <span className="flex items-center gap-2 min-w-0">
+                            <span className="truncate">{item.title}</span>
+                            {showBadge && (
+                              <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] px-1.5 py-0.5">
+                                {pendingLeaves > 99 ? '99+' : pendingLeaves}
+                              </span>
+                            )}
+                          </span>
+                        )}
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

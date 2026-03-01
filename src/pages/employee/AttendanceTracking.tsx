@@ -1,16 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
-import { Clock, Calendar, CheckCircle, XCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Clock, Calendar, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { useAppDispatch } from "@/hooks/useAppDispatch";
-import {
-  clockIn,
-  clockOut,
-  loadTodayRecord,
-} from "@/store/slices/attendanceSlice";
-import { resetTodayRecord } from "@/store/slices/attendanceSlice";
-import type { AttendanceRecord } from "@/store/slices/attendanceSlice";
 import { toast } from "sonner";
 import {
   Table,
@@ -20,445 +11,483 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constant/Config";
 
-const LOCAL_KEY = "attendance_offline_records";
-const TODAY_KEY = "today_record";
+type DayStatus = "Present" | "Leave" | "Week Off";
+
+interface CalendarDay {
+  date: string;
+  status: DayStatus;
+  workMode?: string | null;
+  checkInTime?: string | null;
+  checkOutTime?: string | null;
+  workingHours?: number;
+}
+
+interface CalendarResponse {
+  success: boolean;
+  days: CalendarDay[];
+  statistics: {
+    presentDays: number;
+    leaveDays: number;
+    weekOffDays: number;
+    totalHours: string;
+  };
+}
+
+type SortKey = "date" | "checkIn" | "checkOut" | "hours" | "mode" | "status";
+
+interface AttendanceRow {
+  id: string;
+  date: string;
+  checkInLabel: string;
+  checkOutLabel: string;
+  workMode: string;
+  totalLabel: string;
+  status: DayStatus;
+}
+
+interface Summary {
+  totalDays: number;
+  presentDays: number;
+  leaveDays: number;
+  weekOffDays: number;
+  totalHoursLabel: string;
+}
 
 const AttendanceTracking = () => {
-  const { user } = useAppSelector((state) => state.auth);
-  const { todayRecord } = useAppSelector((state) => state.attendance);
-  const dispatch = useAppDispatch();
+  const { token } = useAppSelector((state) => state.auth);
 
-  const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
-  const [liveWorkingTime, setLiveWorkingTime] = useState("");
-
-  // ⏱️ Calculate working time difference
-  const calculateWorkingTime = useCallback(
-    (timeIn: string, timeOut?: string) => {
-      try {
-        const today = new Date().toISOString().split("T")[0];
-        const clockInTime = new Date(`${today}T${timeIn}`);
-        const clockOutTime = timeOut
-          ? new Date(`${today}T${timeOut}`)
-          : new Date();
-
-        if (clockOutTime < clockInTime) {
-          clockOutTime.setDate(clockOutTime.getDate() + 1);
-        }
-
-        const diffMs = clockOutTime.getTime() - clockInTime.getTime();
-        const totalMinutes = Math.floor(diffMs / 60000);
-        const workinghours = Math.floor(totalMinutes / 60);
-        const workingminutes = totalMinutes % 60;
-
-        return { workinghours, workingminutes, totalMinutes };
-      } catch {
-        return { workinghours: 0, workingminutes: 0, totalMinutes: 0 };
-      }
-    },
-    []
-  );
-
-  // 🧩 Fetch Attendance (API + Cache fallback)
-  const fetchAttendance = async () => {
-    try {
-      const res = await fetch(BASE_URL + `/attendance`);
-      if (!res.ok) throw new Error("Failed to load attendance");
-      const data = await res.json();
-      setAttendance(data);
-      localStorage.setItem("attendance_cache", JSON.stringify(data));
-    } catch {
-      const cached = localStorage.getItem("attendance_cache");
-      if (cached) {
-        setAttendance(JSON.parse(cached));
-        toast.warning("Offline: showing cached attendance");
-      }
-    }
-  };
-
-  // 🕐 Clock In
-  const handleClockIn = async () => {
-    if (!user?.id) return;
-
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
-    const time_in = now.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    const record: AttendanceRecord = {
-      id: crypto.randomUUID(),
-      employee_id: user.id,
-      date: today,
-      time_in,
-      time_out: "",
-      workinghours: 0,
-      workingminutes: 0,
-    };
-
-    try {
-      const res = await fetch(BASE_URL + `/attendance`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(record),
-      });
-
-      if (!res.ok) throw new Error("API down");
-
-      const saved = await res.json();
-      dispatch(clockIn({ record: saved }));
-      localStorage.setItem(TODAY_KEY, JSON.stringify(saved));
-      toast.success(`Clocked in successfully at ${time_in}`);
-      fetchAttendance();
-    } catch {
-      // 📴 Offline Fallback
-      toast.warning("Offline: saved locally");
-      const offlineRecords =
-        JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]") || [];
-      offlineRecords.push({ ...record, synced: false });
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(offlineRecords));
-      localStorage.setItem(TODAY_KEY, JSON.stringify(record));
-      dispatch(clockIn({ record }));
-    }
-  };
-
-  // 🕐 Clock Out
-  const handleClockOut = async () => {
-    if (!user?.id || !todayRecord?.time_in) return;
-
-    const now = new Date();
-    const time_out = now.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    const { workinghours, workingminutes } = calculateWorkingTime(
-      todayRecord.time_in,
-      time_out
-    );
-
-    const updatedRecord = {
-      ...todayRecord,
-      time_out,
-      workinghours,
-      workingminutes,
-    };
-
-    try {
-      const res = await fetch(BASE_URL + `/attendance/${todayRecord.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(updatedRecord),
-      });
-
-      if (!res.ok) throw new Error("API down");
-
-      const saved = await res.json();
-      dispatch(clockOut({ record: saved }));
-      localStorage.setItem(TODAY_KEY, JSON.stringify(saved));
-      toast.success(
-        `Clocked out successfully at ${time_out}! Worked ${workinghours}h ${workingminutes}m`
-      );
-      fetchAttendance();
-    } catch {
-      // 📴 Offline Fallback
-      toast.warning("Offline: checkout saved locally");
-      const offlineRecords =
-        JSON.parse(localStorage.getItem(LOCAL_KEY) || "[]") || [];
-      offlineRecords.push({ ...updatedRecord, synced: false });
-      localStorage.setItem(LOCAL_KEY, JSON.stringify(offlineRecords));
-      localStorage.setItem(TODAY_KEY, JSON.stringify(updatedRecord));
-      dispatch(clockOut({ record: updatedRecord }));
-    }
-  };
-
-  // 🔄 Sync Offline Records to API
-  const syncOfflineRecords = useCallback(async () => {
-    const offlineRecords: AttendanceRecord[] = JSON.parse(
-      localStorage.getItem(LOCAL_KEY) || "[]"
-    );
-    if (!offlineRecords.length) return;
-
-    let synced = 0;
-
-    for (const record of offlineRecords) {
-      try {
-        let res;
-        if (!record.time_out) {
-          // New record
-          res = await fetch(BASE_URL + "/attendance", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(record),
-          });
-          if (res.ok) {
-            const saved = await res.json();
-            record.id = saved.id;
-            record.synced = true;
-            synced++;
-          }
-        } else {
-          // Update record
-          res = await fetch(BASE_URL + `/attendance/${record.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(record),
-          });
-          if (res.ok) {
-            record.synced = true;
-            synced++;
-          }
-        }
-      } catch {
-        console.log("Still offline for:", record.date);
-      }
-    }
-
-    const remaining = offlineRecords.filter((r) => !r.synced);
-    localStorage.setItem(LOCAL_KEY, JSON.stringify(remaining));
-    if (synced > 0) {
-      toast.success(`✅ Synced ${synced} record(s) successfully`);
-      fetchAttendance();
-    }
-  }, []);
-
-  // 🔁 Auto sync every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(syncOfflineRecords, 30000);
-    return () => clearInterval(interval);
-  }, [syncOfflineRecords]);
-
-  // 🌐 Sync immediately when back online
-  useEffect(() => {
-    const handleOnline = () => {
-      toast.info("You're back online! Syncing attendance...");
-      syncOfflineRecords();
-    };
-    window.addEventListener("online", handleOnline);
-    return () => window.removeEventListener("online", handleOnline);
-  }, [syncOfflineRecords]);
-
-  // 🧭 Detect new day and reset today's record (fix: also reset Hours Today)
-  useEffect(() => {
-    const checkNewDay = () => {
-      const currentDate = new Date().toISOString().split("T")[0];
-      const lastDate = localStorage.getItem("last_date_check");
-
-      // if date has changed, reset everything for the new day
-      if (lastDate !== currentDate) {
-        localStorage.setItem("last_date_check", currentDate);
-
-        // clear old record and reset UI state
-        localStorage.removeItem(TODAY_KEY);
-        setLiveWorkingTime("0h 0m"); // ✅ Reset Hours Today card
-        dispatch(resetTodayRecord()); // ✅ reset Redux state
-
-        if (user?.id) {
-          dispatch(loadTodayRecord({ employeeId: user.id }));
-          fetchAttendance();
-        }
-
-        toast.success("🕗 New day detected — attendance reset!");
-      }
-    };
-
-    checkNewDay();
-    const interval = setInterval(checkNewDay, 60000); // check every 1 min
-    return () => clearInterval(interval);
-  }, [user?.id, dispatch]);
-
-  // ⏰ Live clock + timer
-  // ⏰ Live clock + timer
-    useEffect(() => {
-      const timer = setInterval(() => {
-        if (todayRecord?.time_in && !todayRecord?.time_out) {
-          const { workinghours, workingminutes } = calculateWorkingTime(
-            todayRecord.time_in
-          );
-          setLiveWorkingTime(`${workinghours}h ${workingminutes}m`);
-        } else {
-          setLiveWorkingTime("");
-        }
-      }, 1000);
-      return () => clearInterval(timer);
-    }, [todayRecord, calculateWorkingTime]);
-  // 🧠 Initial Load
-  useEffect(() => {
-    const today = new Date().toISOString().split("T")[0];
-    const localToday = localStorage.getItem(TODAY_KEY);
-
-    if (localToday) {
-      const parsed = JSON.parse(localToday);
-      if (parsed.date !== today) {
-        localStorage.removeItem(TODAY_KEY);
-      } else if (user?.id === parsed.employee_id) {
-        dispatch(clockIn({ record: parsed }));
-      }
-    } else if (user?.id) {
-      dispatch(loadTodayRecord({ employeeId: user.id }));
-    }
-
-    fetchAttendance();
-  }, [user?.id, dispatch]);
-
-  // 💼 Calculate monthly total
-  const getStartOfMonth = () => {
-    const today = new Date();
-    return new Date(today.getFullYear(), today.getMonth(), 1);
-  };
-  const startDate = getStartOfMonth();
-
-  const filteredRecords = attendance.filter(
-    (r) => r.employee_id === user?.id && new Date(r.date) >= startDate
-  );
-
-  let totalMinutes = 0;
-  filteredRecords.forEach((r) => {
-    if (r.time_in && r.time_out) {
-      const timeIn = new Date(`${r.date}T${r.time_in}`);
-      const timeOut = new Date(`${r.date}T${r.time_out}`);
-      if (!isNaN(timeIn.getTime()) && !isNaN(timeOut.getTime())) {
-        totalMinutes += Math.floor(
-          (timeOut.getTime() - timeIn.getTime()) / 60000
-        );
-      }
-    }
+  const [rows, setRows] = useState<AttendanceRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [summary, setSummary] = useState<Summary>({
+    totalDays: 0,
+    presentDays: 0,
+    leaveDays: 0,
+    weekOffDays: 0,
+    totalHoursLabel: "0h 0m",
   });
 
-  const totalHours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
+  const todayStr = new Date().toISOString().split("T")[0];
+  const [filterStart, setFilterStart] = useState<string>(todayStr);
+  const [filterEnd, setFilterEnd] = useState<string>(todayStr);
+  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(todayStr);
+
+  const fetchAttendance = useCallback(async () => {
+    if (!token) {
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (startDate) {
+        params.append("startDate", startDate);
+      }
+      if (endDate) {
+        params.append("endDate", endDate);
+      }
+      const res = await fetch(
+        `${API_BASE_URL}/attendance/calendar?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+      if (!res.ok) {
+        throw new Error("Failed to load attendance");
+      }
+      const data: CalendarResponse = await res.json();
+      if (!data.success || !Array.isArray(data.days)) {
+        setRows([]);
+        setSummary({
+          totalDays: 0,
+          presentDays: 0,
+          leaveDays: 0,
+          weekOffDays: 0,
+          totalHoursLabel: "0h 0m",
+        });
+        return;
+      }
+
+      const mapped: AttendanceRow[] = data.days.map((day) => {
+        let checkInLabel = "-";
+        if (day.checkInTime) {
+          const d = new Date(day.checkInTime);
+          checkInLabel = Number.isNaN(d.getTime())
+            ? day.checkInTime
+            : d.toLocaleTimeString("en-IN", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+        }
+
+        let checkOutLabel = "-";
+        if (day.checkOutTime) {
+          const d = new Date(day.checkOutTime);
+          checkOutLabel = Number.isNaN(d.getTime())
+            ? day.checkOutTime
+            : d.toLocaleTimeString("en-IN", {
+                hour12: false,
+                hour: "2-digit",
+                minute: "2-digit",
+              });
+        }
+
+        let totalLabel = "0h 0m";
+        if (typeof day.workingHours === "number") {
+          const h = Math.floor(day.workingHours);
+          const m = Math.round((day.workingHours - h) * 60);
+          totalLabel = `${h}h ${m}m`;
+        }
+
+        const workMode = day.workMode || "-";
+
+        return {
+          id: day.date,
+          date: day.date,
+          checkInLabel,
+          checkOutLabel,
+          workMode,
+          totalLabel,
+          status: day.status,
+        };
+      });
+
+      setRows(mapped);
+
+      setSummary({
+        totalDays: data.days.length,
+        presentDays: data.statistics.presentDays,
+        leaveDays: data.statistics.leaveDays,
+        weekOffDays: data.statistics.weekOffDays,
+        totalHoursLabel: data.statistics.totalHours,
+      });
+    } catch (err) {
+      setRows([]);
+      setSummary({
+        totalDays: 0,
+        presentDays: 0,
+        leaveDays: 0,
+        weekOffDays: 0,
+        totalHoursLabel: "0h 0m",
+      });
+      const message = err instanceof Error ? err.message : "Unable to load attendance";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, startDate, endDate]);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
+
+  const sortedRows = [...rows].sort((a, b) => {
+    const dir = sortDir === "asc" ? 1 : -1;
+    if (sortKey === "date") {
+      return a.date.localeCompare(b.date) * dir;
+    }
+    if (sortKey === "checkIn") {
+      return a.checkInLabel.localeCompare(b.checkInLabel) * dir;
+    }
+    if (sortKey === "checkOut") {
+      return a.checkOutLabel.localeCompare(b.checkOutLabel) * dir;
+    }
+    if (sortKey === "hours") {
+      return a.totalLabel.localeCompare(b.totalLabel) * dir;
+    }
+    if (sortKey === "mode") {
+      return a.workMode.localeCompare(b.workMode) * dir;
+    }
+    if (sortKey === "status") {
+      return a.status.localeCompare(b.status) * dir;
+    }
+    return 0;
+  });
+
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const current = Math.min(currentPage, totalPages);
+  const start = (current - 1) * pageSize;
+  const paginatedRows = sortedRows.slice(start, start + pageSize);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
 
   return (
-    <div className="w-full min-h-full bg-background p-6">
+    <div className="w-full min-h-full bg-background p-4 md:p-6 lg:p-8">
       <div className="space-y-6 w-full">
-        <h2 className="text-2xl font-bold">Attendance Tracking</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
+              Attendance Overview
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Monthly calendar view with status for each day.
+            </p>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground shrink-0">
+            <Calendar className="h-4 w-4" />
+            <span className="hidden lg:inline">
+              {new Date().toLocaleDateString("en-IN", {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+              })}
+            </span>
+            <span className="lg:hidden">
+              {new Date().toLocaleDateString("en-IN", {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+          </div>
+        </div>
 
-        {/* Status Cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {/* Today Status */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="flex justify-between">
-              <CardTitle>Today's Status</CardTitle>
-              <div
-                className={`p-2 rounded-full ${
-                  todayRecord?.time_in && !todayRecord?.time_out
-                    ? "bg-green-500/10"
-                    : todayRecord?.time_out
-                    ? "bg-red-500/10"
-                    : "bg-blue-500/10"
-                }`}
-              >
-                <Clock className="h-4 w-4" />
-              </div>
+      
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Present Days</CardTitle>
+              <CheckCircle className="h-4 w-4 text-green-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold">
-                {todayRecord?.time_in && !todayRecord?.time_out
-                  ? "Checked In"
-                  : todayRecord?.time_out
-                  ? "Checked Out"
-                  : "Not Checked In"}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Hours Today */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="flex justify-between">
-              <CardTitle>Hours Today</CardTitle>
-              <Calendar className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-xl font-bold text-green-600">
-                {todayRecord?.time_in && !todayRecord?.time_out
-                  ? liveWorkingTime || "0h 0m"
-                  : todayRecord?.workinghours
-                  ? `${todayRecord.workinghours}h ${todayRecord.workingminutes}m`
-                  : "0h 0m"}
+              <div className="text-2xl font-bold text-green-600">
+                {summary.presentDays}
               </div>
             </CardContent>
           </Card>
 
-          {/* Month Total */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader className="flex justify-between">
-              <CardTitle>This Month</CardTitle>
-              <CheckCircle className="h-4 w-4 text-purple-600" />
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Leave Days</CardTitle>
+              <Calendar className="h-4 w-4 text-red-600" />
             </CardHeader>
             <CardContent>
-              <div className="text-xl font-bold text-purple-600">
-                {totalHours}h {remainingMinutes}m
+              <div className="text-2xl font-bold text-red-600">
+                {summary.leaveDays}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Week Off Days</CardTitle>
+              <Calendar className="h-4 w-4 text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {summary.weekOffDays}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+              <Clock className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {summary.totalHoursLabel}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Actions */}
-        <Card className="shadow-lg border-0">
+
+  <Card className="shadow-sm border-0">
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Filter by Date</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <Button
-                onClick={handleClockIn}
-                disabled={!!todayRecord?.time_in}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <CheckCircle className="h-4 w-4 mr-2" /> Check In
-              </Button>
-              <Button
-                onClick={handleClockOut}
-                disabled={!todayRecord?.time_in || !!todayRecord?.time_out}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-              >
-                <XCircle className="h-4 w-4 mr-2" /> Check Out
-              </Button>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-1 text-sm">
+                <span>Start Date</span>
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1 text-sm bg-background"
+                  value={filterStart}
+                  max={todayStr}
+                  onChange={(e) => setFilterStart(e.target.value)}
+                />
+              </div>
+              <div className="grid gap-1 text-sm">
+                <span>End Date</span>
+                <input
+                  type="date"
+                  className="border rounded px-2 py-1 text-sm bg-background"
+                  value={filterEnd}
+                  max={todayStr}
+                  onChange={(e) => setFilterEnd(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm w-full sm:w-auto"
+                  onClick={() => {
+                    if (!filterStart || !filterEnd) {
+                      toast.error("Please select both start and end dates.");
+                      return;
+                    }
+                    if (filterStart > filterEnd) {
+                      toast.error("Start date cannot be after end date.");
+                      return;
+                    }
+                    const today = todayStr;
+                    const end = filterEnd > today ? today : filterEnd;
+                    setStartDate(filterStart);
+                    setEndDate(end);
+                    setCurrentPage(1);
+                  }}
+                >
+                  Apply
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* History */}
+
         <Card className="shadow-lg border-0">
           <CardHeader>
-            <CardTitle>Attendance History</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Attendance History</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-md border overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>In</TableHead>
-                    <TableHead>Out</TableHead>
-                    <TableHead>Hours</TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("date")}
+                    >
+                      Date
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("checkIn")}
+                    >
+                      Check-In
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("checkOut")}
+                    >
+                      Check-Out
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("hours")}
+                    >
+                      Total Hours
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("mode")}
+                    >
+                      Mode
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer"
+                      onClick={() => handleSort("status")}
+                    >
+                      Status
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {attendance
-                    .filter((r) => r.employee_id === user?.id)
-                    .slice(0, 10)
-                    .map((r) => (
-                      <TableRow key={r.id}>
-                        <TableCell>{r.date}</TableCell>
-                        <TableCell>{r.time_in}</TableCell>
-                        <TableCell>{r.time_out || "In Progress"}</TableCell>
+                  {loading && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-sm">
+                        Loading attendance...
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!loading && error && rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-sm">
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!loading && !error && rows.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center py-6 text-sm">
+                        No attendance records found.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {!loading &&
+                    !error &&
+                    paginatedRows.map((row) => (
+                      <TableRow key={row.id}>
+                        <TableCell>{row.date}</TableCell>
+                        <TableCell>{row.checkInLabel}</TableCell>
+                        <TableCell>{row.checkOutLabel}</TableCell>
+                        <TableCell>{row.totalLabel}</TableCell>
+                        <TableCell>{row.workMode}</TableCell>
                         <TableCell>
-                          {r.time_out
-                            ? `${r.workinghours}h ${r.workingminutes}m`
-                            : "In Progress"}
+                          {row.status === "Present" && (
+                            <span className="text-green-600">Present</span>
+                          )}
+                          {row.status === "Leave" && (
+                            <span className="text-red-600">Leave</span>
+                          )}
+                          {row.status === "Week Off" && (
+                            <span className="text-yellow-600">Week Off</span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
                 </TableBody>
               </Table>
             </div>
+            {rows.length > 0 && (
+              <div className="flex items-center justify-between mt-4 text-xs sm:text-sm">
+                <div>
+                  Page {current} of {totalPages}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="px-2 py-1 rounded border text-xs disabled:opacity-50"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={current === 1}
+                  >
+                    Prev
+                  </button>
+                  <button
+                    type="button"
+                    className="px-2 py-1 rounded border text-xs disabled:opacity-50"
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                    disabled={current === totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

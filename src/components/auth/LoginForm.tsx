@@ -62,7 +62,7 @@ export const LoginForm = () => {
           variant: "destructive"
         });
       }
-    } catch (error) {
+    } catch {
       toast({
         title: "Login failed",
         description: "An error occurred during login",
@@ -71,15 +71,7 @@ export const LoginForm = () => {
     }
   };
 
-  const fillDemoCredentials = (role: 'admin' | 'employee') => {
-    if (role === 'admin') {
-      setEmail('admin@company.com');
-      setPassword('admin123');
-    } else {
-      setEmail('employee@company.com');
-      setPassword('employee123');
-    }
-  };
+  
 
   return (
     <Card className="w-full shadow-lg border-card-border">
@@ -149,26 +141,14 @@ export const LoginForm = () => {
           </Button>
         </form>
 
-        <div className="space-y-2 sm:space-y-3">
-          <p className="text-xs sm:text-sm text-muted-foreground text-center">Demo accounts:</p>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 sm:h-9 text-xs sm:text-sm"
-              onClick={() => fillDemoCredentials('admin')}
-            >
-              Admin Demo
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 h-8 sm:h-9 text-xs sm:text-sm"
-              onClick={() => fillDemoCredentials('employee')}
-            >
-              Employee Demo
-            </Button>
-          </div>
+        <div className="text-center pt-2">
+          <Button
+            variant="link"
+            onClick={() => navigate('/auth/forgot-password')}
+            className="text-sm"
+          >
+            Forgot your password?
+          </Button>
         </div>
 
         {/* <div className="text-center">

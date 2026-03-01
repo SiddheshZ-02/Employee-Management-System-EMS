@@ -21,7 +21,7 @@ const LOCAL_KEY_TODAY = "today_record";
 const LOCAL_KEY_OFFLINE = "attendance_offline_records";
 
 /* 🔹 Helper: Save & Load LocalStorage safely */
-const saveToLocalStorage = (key: string, data: any) => {
+const saveToLocalStorage = (key: string, data: unknown) => {
   try {
     localStorage.setItem(key, JSON.stringify(data));
   } catch (err) {
@@ -29,7 +29,7 @@ const saveToLocalStorage = (key: string, data: any) => {
   }
 };
 
-const loadFromLocalStorage = (key: string): any => {
+const loadFromLocalStorage = (key: string): unknown => {
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : undefined;
@@ -40,8 +40,12 @@ const loadFromLocalStorage = (key: string): any => {
 };
 
 /* 🔹 Initialize from localStorage */
-const initialToday = loadFromLocalStorage(LOCAL_KEY_TODAY);
-const initialOffline = loadFromLocalStorage(LOCAL_KEY_OFFLINE) || [];
+const initialToday = loadFromLocalStorage(LOCAL_KEY_TODAY) as
+  | AttendanceRecord
+  | undefined;
+const initialOffline =
+  (loadFromLocalStorage(LOCAL_KEY_OFFLINE) as AttendanceRecord[] | undefined) ||
+  [];
 
 const initialState: AttendanceState = {
   records: initialOffline,
@@ -75,7 +79,9 @@ const attendanceSlice = createSlice({
 
     loadTodayRecord: (state, action: PayloadAction<{ employeeId: string }>) => {
       const today = new Date().toISOString().split("T")[0];
-      const localToday = loadFromLocalStorage(LOCAL_KEY_TODAY);
+      const localToday = loadFromLocalStorage(
+        LOCAL_KEY_TODAY
+      ) as AttendanceRecord | undefined;
       if (localToday && localToday.employee_id === action.payload.employeeId) {
         if (localToday.date === today) {
           state.todayRecord = localToday;
@@ -93,7 +99,8 @@ const attendanceSlice = createSlice({
 
     addOfflineRecord: (_state, action: PayloadAction<AttendanceRecord>) => {
       const offlineRecords: AttendanceRecord[] =
-        loadFromLocalStorage(LOCAL_KEY_OFFLINE) || [];
+        (loadFromLocalStorage(LOCAL_KEY_OFFLINE) as AttendanceRecord[] | undefined) ||
+        [];
       offlineRecords.push(action.payload);
       saveToLocalStorage(LOCAL_KEY_OFFLINE, offlineRecords);
     },
@@ -103,14 +110,16 @@ const attendanceSlice = createSlice({
       action: PayloadAction<{ id: string }>
     ) => {
       const offlineRecords: AttendanceRecord[] =
-        loadFromLocalStorage(LOCAL_KEY_OFFLINE) || [];
+        (loadFromLocalStorage(LOCAL_KEY_OFFLINE) as AttendanceRecord[] | undefined) ||
+        [];
       const remaining = offlineRecords.filter((r) => r.id !== action.payload.id);
       saveToLocalStorage(LOCAL_KEY_OFFLINE, remaining);
     },
 
     syncAllOfflineRecords: (state) => {
       const offlineRecords: AttendanceRecord[] =
-        loadFromLocalStorage(LOCAL_KEY_OFFLINE) || [];
+        (loadFromLocalStorage(LOCAL_KEY_OFFLINE) as AttendanceRecord[] | undefined) ||
+        [];
       if (offlineRecords.length > 0) {
         state.records.push(...offlineRecords);
       }
