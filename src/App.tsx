@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import SessionTimeoutManager from "@/components/layout/SessionTimeoutManager";
 
 const AuthPage = lazy(() =>
   import("@/pages/Auth").then((m) => ({ default: m.Auth }))
@@ -108,6 +109,7 @@ const App = () => (
           <Toaster />
           <Sonner />
           <HashRouter>
+            <SessionTimeoutManager />
             <Suspense fallback={<div className="p-4">Loading...</div>}>
               <Routes>
                 <Route path="/auth" element={<AuthPage />} />
