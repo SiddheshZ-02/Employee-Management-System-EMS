@@ -21,6 +21,26 @@ const ProtectedRouteLazy = lazy(() =>
     default: m.ProtectedRoute,
   }))
 );
+const OwnerDashboardLazy = lazy(() =>
+  import("@/pages/owner/OwnerDashboard").then((m) => ({
+    default: m.OwnerDashboard,
+  }))
+);
+const OwnerCompanyListLazy = lazy(() =>
+  import("@/pages/owner/CompanyList").then((m) => ({
+    default: m.CompanyList,
+  }))
+);
+const OwnerCreateCompanyLazy = lazy(() =>
+  import("@/pages/owner/CreateCompany").then((m) => ({
+    default: m.CreateCompany,
+  }))
+);
+const OwnerCompanyAdminsLazy = lazy(() =>
+  import("@/pages/owner/CompanyAdmins").then((m) => ({
+    default: m.CompanyAdmins,
+  }))
+);
 const AdminDashboardLazy = lazy(() =>
   import("@/pages/admin/AdminDashboard").then((m) => ({
     default: m.AdminDashboard,
@@ -34,11 +54,6 @@ const EmployeeManagementLazy = lazy(() =>
 const DepartmentManagementLazy = lazy(() =>
   import("@/pages/admin/DepartmentManagement").then((m) => ({
     default: m.DepartmentManagement,
-  }))
-);
-const UserManagementLazy = lazy(() =>
-  import("@/pages/admin/UserManagement").then((m) => ({
-    default: m.UserManagement,
   }))
 );
 const AdminLeaveRequestsLazy = lazy(() =>
@@ -144,7 +159,6 @@ const App = () => (
                     path="departments"
                     element={<DepartmentManagementLazy />}
                   />
-                  <Route path="users" element={<UserManagementLazy />} />
                   <Route
                     path="leave-requests"
                     element={<AdminLeaveRequestsLazy />}
@@ -159,6 +173,29 @@ const App = () => (
                     element={<OfficeLocationPageLazy />}
                   />
                   <Route path="weekoff" element={<AdminAccessLazy />} />
+                </Route>
+
+                <Route
+                  path="/owner"
+                  element={
+                    <ProtectedRouteLazy requiredRole="Owner">
+                      <DashboardLayoutLazy />
+                    </ProtectedRouteLazy>
+                  }
+                >
+                  <Route path="dashboard" element={<OwnerDashboardLazy />} />
+                  <Route
+                    path="companies"
+                    element={<OwnerCompanyListLazy />}
+                  />
+                  <Route
+                    path="companies/create"
+                    element={<OwnerCreateCompanyLazy />}
+                  />
+                  <Route
+                    path="companies/:id/admins"
+                    element={<OwnerCompanyAdminsLazy />}
+                  />
                 </Route>
 
                 <Route

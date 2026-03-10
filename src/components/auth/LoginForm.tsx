@@ -49,9 +49,10 @@ export const LoginForm = () => {
           description: `Successfully logged in as ${authState.user?.role}`,
         });
         
-        // Navigate based on role
         if (authState.user?.role === 'Admin') {
           navigate('/admin/dashboard');
+        } else if (authState.user?.role === 'Owner') {
+          navigate('/owner/dashboard');
         } else {
           navigate('/employee/dashboard');
         }

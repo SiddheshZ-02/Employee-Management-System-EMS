@@ -101,7 +101,6 @@ export const SignupForm = ({ onToggleMode }: SignupFormProps) => {
       description: `Welcome ${name}! Your ${role} account has been created.`,
     });
 
-    // Navigate based on role
     if (role === 'Admin') {
       navigate('/admin/dashboard');
     } else {

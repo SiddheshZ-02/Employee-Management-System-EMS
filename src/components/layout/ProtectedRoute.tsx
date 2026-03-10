@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import { useAppSelector } from '@/hooks/useAppSelector';
-import {  type UserRole } from '@/store/slices/authSlice';
+import { type UserRole } from '@/store/slices/authSlice';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -15,8 +15,12 @@ export const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) 
   }
 
   if (requiredRole && user.role !== requiredRole) {
-    // Redirect to appropriate dashboard based on user role
-    const redirectPath = user.role === 'Admin' ? '/admin/dashboard' : '/employee/dashboard';
+    let redirectPath = '/employee/dashboard';
+    if (user.role === 'Admin') {
+      redirectPath = '/admin/dashboard';
+    } else if (user.role === 'Owner') {
+      redirectPath = '/owner/dashboard';
+    }
     return <Navigate to={redirectPath} replace />;
   }
 

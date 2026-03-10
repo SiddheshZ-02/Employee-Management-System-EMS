@@ -13,13 +13,12 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useAppSelector } from '@/hooks/useAppSelector';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  UserCog, 
-  Clock, 
-  Calendar, 
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  Clock,
+  Calendar,
   User,
   LogOut,
   ClipboardList,
@@ -46,11 +45,6 @@ const adminNavItems = [
     title: 'Department Management',
     url: '/admin/departments',
     icon: Building2,
-  },
-  {
-    title: 'Admin Management',
-    url: '/admin/users',
-    icon: UserCog,
   },
   {
     title: 'Leave Requests',
@@ -94,6 +88,19 @@ const employeeNavItems = [
     title: 'Profile',
     url: '/employee/profile',
     icon: User,
+  },
+];
+
+const ownerNavItems = [
+  {
+    title: 'Dashboard',
+    url: '/owner/dashboard',
+    icon: LayoutDashboard,
+  },
+  {
+    title: 'Companies',
+    url: '/owner/companies',
+    icon: Building2,
   },
 ];
 
@@ -159,7 +166,12 @@ export function AppSidebar() {
     };
   }, [token, user?.role]);
 
-  const navItems = user?.role === 'Admin' ? adminNavItems : employeeNavItems;
+  const navItems =
+    user?.role === 'Admin'
+      ? adminNavItems
+      : user?.role === 'Owner'
+      ? ownerNavItems
+      : employeeNavItems;
   // const isActived = (path: string) => currentPath === path;
   const getNavClass = ({ isActive }: { isActive: boolean }) =>
     `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`;

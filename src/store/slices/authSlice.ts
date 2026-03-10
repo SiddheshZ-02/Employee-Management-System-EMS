@@ -3,13 +3,14 @@ import { API_BASE_URL, SESSION_TIMEOUT_MS } from "@/constant/Config";
 import type { AppDispatch, RootState } from "@/store";
 // import { useDispatch } from 'react-redux';
 
-export type UserRole = "Admin" | "Employee";
+export type UserRole = "Owner" | "Admin" | "Employee";
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  companyId?: string;
   department?: string;
   phone?: string;
   avatar?: string;
@@ -53,10 +54,12 @@ const authSlice = createSlice({
       state.sessionExpiry = expiry;
       state.sessionExpired = false;
 
-      // Persist to localStorage
-      localStorage.setItem("token", action.payload.token);
-      localStorage.setItem("user", JSON.stringify(action.payload.user));
-      localStorage.setItem("sessionExpiry", String(expiry));
+      localStorage.setItem("ems_token", action.payload.token);
+      localStorage.setItem("ems_user", JSON.stringify(action.payload.user));
+      localStorage.setItem("ems_sessionExpiry", String(expiry));
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("sessionExpiry");
     },
     loginFailure: (state) => {
       state.loading = false;
@@ -73,16 +76,22 @@ const authSlice = createSlice({
       state.sessionExpiry = null;
       state.sessionExpired = false;
 
-      // Clear localStorage
+      localStorage.removeItem("ems_token");
+      localStorage.removeItem("ems_user");
+      localStorage.removeItem("ems_sessionExpiry");
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
       localStorage.removeItem("sessionExpiry");
     },
     loadUserFromStorage: (state) => {
-      const token = localStorage.getItem("token");
-      const userStr = localStorage.getItem("user");
-      const expiryStr = localStorage.getItem("sessionExpiry");
+      const token =
+        localStorage.getItem("ems_token") || localStorage.getItem("token");
+      const userStr =
+        localStorage.getItem("ems_user") || localStorage.getItem("user");
+      const expiryStr =
+        localStorage.getItem("ems_sessionExpiry") ||
+        localStorage.getItem("sessionExpiry");
       const expiry = expiryStr ? Number(expiryStr) : null;
 
       if (token && userStr && expiry && expiry > Date.now()) {
@@ -99,6 +108,9 @@ const authSlice = createSlice({
         state.token = null;
         state.isAuthenticated = false;
         state.sessionExpiry = null;
+        localStorage.removeItem("ems_token");
+        localStorage.removeItem("ems_user");
+        localStorage.removeItem("ems_sessionExpiry");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("sessionExpiry");
@@ -131,22 +143,24 @@ const authSlice = createSlice({
       state.sessionExpiry = expiry;
       state.sessionExpired = false;
 
-      // Persist to localStorage
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(newUser));
-      localStorage.setItem("sessionExpiry", String(expiry));
+      localStorage.setItem("ems_token", token);
+      localStorage.setItem("ems_user", JSON.stringify(newUser));
+      localStorage.setItem("ems_sessionExpiry", String(expiry));
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("sessionExpiry");
     },
     updateProfile: (state, action: PayloadAction<Partial<User>>) => {
       if (state.user) {
         state.user = { ...state.user, ...action.payload };
-        localStorage.setItem("user", JSON.stringify(state.user));
+        localStorage.setItem("ems_user", JSON.stringify(state.user));
       }
     },
     refreshSession: (state) => {
       if (state.isAuthenticated) {
         const expiry = Date.now() + SESSION_TIMEOUT_MS;
         state.sessionExpiry = expiry;
-        localStorage.setItem("sessionExpiry", String(expiry));
+        localStorage.setItem("ems_sessionExpiry", String(expiry));
       }
     },
     expireSession: (state) => {
@@ -155,6 +169,9 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.sessionExpired = true;
       state.sessionExpiry = null;
+      localStorage.removeItem("ems_token");
+      localStorage.removeItem("ems_user");
+      localStorage.removeItem("ems_sessionExpiry");
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
       localStorage.removeItem("user");
@@ -165,7 +182,8 @@ const authSlice = createSlice({
     },
     setToken: (state, action: PayloadAction<string>) => {
       state.token = action.payload;
-      try { localStorage.setItem('token', action.payload); } catch {}
+      localStorage.setItem("ems_token", action.payload);
+      localStorage.removeItem("token");
     },
   },
 });
@@ -197,16 +215,20 @@ export const loginAsync =
       }
 
       const apiUser = data.data;
-      const mappedRole: UserRole =
-        apiUser.role === "admin" || apiUser.role === "manager"
-          ? "Admin"
-          : "Employee";
+      let mappedRole: UserRole = "Employee";
+
+      if (apiUser.role === "owner") {
+        mappedRole = "Owner";
+      } else if (apiUser.role === "admin" || apiUser.role === "manager") {
+        mappedRole = "Admin";
+      }
 
       const user: User = {
         id: apiUser._id,
         email: apiUser.email,
         name: apiUser.name,
         role: mappedRole,
+        companyId: apiUser.companyId,
         department: apiUser.department,
         phone: apiUser.phone,
       };
@@ -214,7 +236,7 @@ export const loginAsync =
       const token: string = apiUser.token;
       const refreshToken: string | undefined = apiUser.refreshToken;
       if (refreshToken) {
-        try { localStorage.setItem("refreshToken", refreshToken); } catch {}
+        localStorage.setItem("refreshToken", refreshToken);
       }
 
       dispatch(loginSuccess({ user, token }));
