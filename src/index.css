@@ -85,6 +85,15 @@ html {
 }
 
 /* Webkit scrollbar styles for better cross-browser support */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
   height: 6px;

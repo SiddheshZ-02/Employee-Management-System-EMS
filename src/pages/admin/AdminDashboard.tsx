@@ -8,7 +8,7 @@ import {
 import { Suspense, lazy } from "react";
 import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Building2, UserCheck, Calendar } from "lucide-react";
+import { Building2, Calendar } from "lucide-react";
 import { useEffect } from "react";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
@@ -169,78 +169,10 @@ export const AdminDashboard = () => {
 
           {/* Quick Actions */}
           <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden">
-              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
-                <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
-                  <div className="p-1 sm:p-1.5 md:p-2 rounded-full bg-blue-500/10 shrink-0">
-                    <UserCheck className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-blue-600" />
-                  </div>
-                  <span className="truncate text-xs sm:text-sm md:text-base">
-                    Recent Employee Activity
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm hidden sm:block">
-                  Latest employee registrations and updates
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-0 px-3 sm:px-6">
-                <div className="space-y-2 sm:space-y-3">
-                  {employees.slice(0, 3).map((employee, index) => (
-                    <div
-                      key={employee.id}
-                      className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors animate-fade-in"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <div className="flex h-6 w-6 sm:h-8 sm:w-8 md:h-10 md:w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-medium text-xs shrink-0">
-                        {employee.name
-                          .split(" ")
-                          .map((n) => n[0])
-                          .join("")}
-                      </div>
-                      <div className="flex-1 space-y-0.5 sm:space-y-1 min-w-0">
-                        <p className="text-xs sm:text-sm font-medium leading-tight truncate">
-                          {employee.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          <span className="hidden md:inline">
-                            {employee.position} •{" "}
-                          </span>
-                          <span className="md:hidden">
-                            {employee.position.length > 15
-                              ? employee.position.substring(0, 15) + "..."
-                              : employee.position}
-                          </span>
-                          <span className="hidden md:inline">
-                            {employee.department}
-                          </span>
-                          <span className="md:hidden">
-                            {" "}
-                            •{" "}
-                            {employee.department.length > 10
-                              ? employee.department.substring(0, 10) + "..."
-                              : employee.department}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="text-sm text-muted-foreground shrink-0">
-                        {employee.status === "Active" ? (
-                          <span className="inline-flex items-center rounded-full bg-green-500/10 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium text-green-600 border border-green-500/20">
-                            <span className="hidden sm:inline">● </span>Active
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center rounded-full bg-gray-500/10 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium text-gray-600 border border-gray-500/20">
-                            <span className="hidden sm:inline">● </span>Inactive
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <UpcomingHolidaysWidget />
 
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden">
-              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6">
+            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden flex flex-col h-[380px]">
+              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 shrink-0">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
                   <div className="p-1 sm:p-1.5 md:p-2 rounded-full bg-purple-500/10 shrink-0">
                     <Building2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-purple-600" />
@@ -253,9 +185,9 @@ export const AdminDashboard = () => {
                   Current department statistics and management
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0 px-3 sm:px-6">
+              <CardContent className="pt-0 px-3 sm:px-6 overflow-y-auto scrollbar-hide flex-1">
                 <div className="space-y-2 sm:space-y-3">
-                  {departments.slice(0, 3).map((dept, index) => (
+                  {departments.map((dept, index) => (
                     <div
                       key={dept.id}
                       className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors animate-fade-in"
@@ -292,10 +224,6 @@ export const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
-          </div>
-
-          <div className="grid gap-6 grid-cols-1">
-            <UpcomingHolidaysWidget />
           </div>
 
           {/* Analytics Charts */}

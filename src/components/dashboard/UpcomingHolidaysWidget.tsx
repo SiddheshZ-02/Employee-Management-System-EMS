@@ -41,13 +41,13 @@ export const UpcomingHolidaysWidget = () => {
   const upcomingHolidays = useMemo(() => {
     return holidays
       .filter((h) => isAfter(parseISO(h.date), today) || isSameDay(parseISO(h.date), today))
-      .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(0, 4); // Show up to 4 upcoming holidays
+      .sort((a, b) => a.date.localeCompare(b.date));
+      // Removed slice to show all in scrollable area
   }, [holidays, today]);
 
   return (
-    <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden bg-gradient-to-br from-card to-card/95">
-      <CardHeader className="pb-4">
+    <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden bg-gradient-to-br from-card to-card/95 flex flex-col h-[380px]">
+      <CardHeader className="pb-4 shrink-0">
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <div className="p-2 rounded-full bg-primary/10">
@@ -57,7 +57,7 @@ export const UpcomingHolidaysWidget = () => {
           </CardTitle>
           {upcomingHolidays.length > 0 && (
             <Badge variant="secondary" className="font-medium bg-primary/5 text-primary border-primary/10">
-              Next {upcomingHolidays.length} events
+              {upcomingHolidays.length} events
             </Badge>
           )}
         </div>
@@ -65,7 +65,7 @@ export const UpcomingHolidaysWidget = () => {
           Plan your time off around these upcoming breaks
         </CardDescription>
       </CardHeader>
-      <CardContent className="px-6 pb-6 pt-0">
+      <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
         {upcomingHolidays.length > 0 ? (
           <div className="space-y-3">
             {upcomingHolidays.map((holiday, index) => {

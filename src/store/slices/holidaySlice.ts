@@ -6,7 +6,6 @@ export interface Holiday {
   name: string;
   date: string;
   isRecurring: boolean;
-  description?: string;
   officeLocation?: {
     _id: string;
     name: string;

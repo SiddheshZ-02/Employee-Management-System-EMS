@@ -288,63 +288,10 @@ export const EmployeeDashboard = () => {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-blue-500/10">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <span>Weekly Attendance</span>
-                </CardTitle>
-                <CardDescription>
-                  Working hours for the current week
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="h-[250px] mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyData}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      vertical={false}
-                      stroke="#f0f0f0"
-                    />
-                    <XAxis
-                      dataKey="day"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#888", fontSize: 12 }}
-                    />
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: "#888", fontSize: 12 }}
-                      unit="h"
-                    />
-                    <Tooltip
-                      cursor={false}
-                      contentStyle={{
-                        borderRadius: "8px",
-                        border: "none",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
-                      }}
-                    />
-                    <Bar dataKey="hours" radius={[4, 4, 0, 0]} barSize={30}>
-                      {weeklyData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.hours > 0 ? "#3b82f6" : "#e2e8f0"}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
             <UpcomingHolidaysWidget />
 
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden lg:col-span-2">
-              <CardHeader>
+            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden flex flex-col h-[380px]">
+              <CardHeader className="shrink-0">
                 <CardTitle className="flex items-center gap-2">
                   <div className="p-2 rounded-full bg-green-500/10">
                     <CheckCircle className="h-5 w-5 text-green-600" />
@@ -355,7 +302,7 @@ export const EmployeeDashboard = () => {
                   Your recent actions and updates
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="overflow-y-auto scrollbar-hide flex-1">
                 <div className="space-y-4">
                   {isLoadingActivities ? (
                     <div className="flex flex-col space-y-3">
@@ -438,6 +385,61 @@ export const EmployeeDashboard = () => {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden lg:col-span-2">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2">
+                  <div className="p-2 rounded-full bg-blue-500/10">
+                    <TrendingUp className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <span>Weekly Attendance</span>
+                </CardTitle>
+                <CardDescription>
+                  Working hours for the current week
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="h-[250px] mt-4">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={weeklyData}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      vertical={false}
+                      stroke="#f0f0f0"
+                    />
+                    <XAxis
+                      dataKey="day"
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#888", fontSize: 12 }}
+                    />
+                    <YAxis
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#888", fontSize: 12 }}
+                      unit="h"
+                      domain={[0, 24]}
+                      ticks={[0, 4, 8, 12, 16, 20, 24]}
+                    />
+                    <Tooltip
+                      cursor={false}
+                      contentStyle={{
+                        borderRadius: "8px",
+                        border: "none",
+                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      }}
+                    />
+                    <Bar dataKey="hours" radius={[4, 4, 0, 0]} barSize={30}>
+                      {weeklyData.map((entry, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={entry.hours > 0 ? "#3b82f6" : "#e2e8f0"}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
               </CardContent>
             </Card>
           </div>
