@@ -91,7 +91,7 @@ export const ProfileManagement = () => {
       <div className="w-full h-full p-4 md:p-6 lg:p-8">
         <div className="space-y-6 w-full max-w-4xl mx-auto">
       <div className="flex flex-col space-y-2">
-        <h2 className="text-2xl sm:text-3xl font-bold">Profile Management</h2>
+        <h2 className="text-2xl sm:text-2xl font-bold">Profile Management</h2>
         <p className="text-sm sm:text-base text-muted-foreground">Manage your personal information</p>
       </div>
 

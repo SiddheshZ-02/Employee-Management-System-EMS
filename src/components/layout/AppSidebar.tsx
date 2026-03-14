@@ -62,7 +62,7 @@ const adminNavItems = [
     icon: Building2,
   },
   {
-    title: 'Admin Access',
+    title: 'Admin Access & Holidays',
     url: '/admin/weekoff',
     icon: Calendar,
   },
@@ -82,6 +82,11 @@ const employeeNavItems = [
   {
     title: 'Leave Management',
     url: '/employee/leave',
+    icon: Calendar,
+  },
+  {
+    title: 'Holidays',
+    url: '/employee/holidays',
     icon: Calendar,
   },
   {

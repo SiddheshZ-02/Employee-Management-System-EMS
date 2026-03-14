@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Clock, Calendar, CheckCircle } from "lucide-react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { toast } from "sonner";
@@ -11,9 +11,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/constant/Config";
+import { Badge } from "@/components/ui/badge";
 
-type DayStatus = "Present" | "Leave" | "Week Off";
+type DayStatus = "Present" | "Leave" | "Week Off" | "Holiday";
 
 interface CalendarDay {
   date: string;
@@ -31,6 +33,7 @@ interface CalendarResponse {
     presentDays: number;
     leaveDays: number;
     weekOffDays: number;
+    holidayDays: number;
     totalHours: string;
   };
 }
@@ -52,30 +55,39 @@ interface Summary {
   presentDays: number;
   leaveDays: number;
   weekOffDays: number;
+  holidayDays: number;
   totalHoursLabel: string;
 }
 
 const AttendanceTracking = () => {
   const { token } = useAppSelector((state) => state.auth);
 
+  // Calculate default 30 days range
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+
+  const todayStr = today.toISOString().split("T")[0];
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sortKey, setSortKey] = useState<SortKey>("date");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [summary, setSummary] = useState<Summary>({
     totalDays: 0,
     presentDays: 0,
     leaveDays: 0,
     weekOffDays: 0,
+    holidayDays: 0,
     totalHoursLabel: "0h 0m",
   });
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const [filterStart, setFilterStart] = useState<string>(todayStr);
+  const [filterStart, setFilterStart] = useState<string>(thirtyDaysAgoStr);
   const [filterEnd, setFilterEnd] = useState<string>(todayStr);
-  const [startDate, setStartDate] = useState<string>(todayStr);
+  const [startDate, setStartDate] = useState<string>(thirtyDaysAgoStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
 
   const fetchAttendance = useCallback(async () => {
@@ -111,6 +123,7 @@ const AttendanceTracking = () => {
           presentDays: 0,
           leaveDays: 0,
           weekOffDays: 0,
+          holidayDays: 0,
           totalHoursLabel: "0h 0m",
         });
         return;
@@ -168,6 +181,7 @@ const AttendanceTracking = () => {
         presentDays: data.statistics.presentDays,
         leaveDays: data.statistics.leaveDays,
         weekOffDays: data.statistics.weekOffDays,
+        holidayDays: data.statistics.holidayDays || 0,
         totalHoursLabel: data.statistics.totalHours,
       });
     } catch (err) {
@@ -177,6 +191,7 @@ const AttendanceTracking = () => {
         presentDays: 0,
         leaveDays: 0,
         weekOffDays: 0,
+        holidayDays: 0,
         totalHoursLabel: "0h 0m",
       });
       const message = err instanceof Error ? err.message : "Unable to load attendance";
@@ -229,268 +244,350 @@ const AttendanceTracking = () => {
     }
   };
 
+  const resetFilters = () => {
+    setFilterStart(thirtyDaysAgoStr);
+    setFilterEnd(todayStr);
+    setStartDate(thirtyDaysAgoStr);
+    setEndDate(todayStr);
+    setCurrentPage(1);
+  };
+
+  const getStatusBadge = (status: DayStatus) => {
+    switch (status) {
+      case "Present":
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20">Present</Badge>;
+      case "Leave":
+        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Leave</Badge>;
+      case "Week Off":
+        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20">Week Off</Badge>;
+      case "Holiday":
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">Holiday</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   return (
-    <div className="w-full min-h-full bg-background p-4 md:p-6 lg:p-8">
-      <div className="space-y-6 w-full">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">
-              Attendance Overview
-            </h2>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              Monthly calendar view with status for each day.
-            </p>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-            <Calendar className="h-4 w-4" />
-            <span className="hidden lg:inline">
-              {new Date().toLocaleDateString("en-IN", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-              })}
-            </span>
-            <span className="lg:hidden">
-              {new Date().toLocaleDateString("en-IN", {
-                month: "short",
-                day: "numeric",
-              })}
-            </span>
+    <div className="w-full min-h-full bg-background p-4 md:p-6 lg:p-8 space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            Attendance Overview
+          </h2>
+          <p className="text-muted-foreground">
+            View and manage your attendance records with detailed analytics.
+          </p>
+        </div>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-card border border-border rounded-md shadow-sm text-sm font-medium text-muted-foreground">
+            <Calendar className="h-4 w-4 text-primary" />
+            {new Date().toLocaleDateString("en-IN", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
           </div>
         </div>
+      </div>
 
-      
-
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Present Days</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {summary.presentDays}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Leave Days</CardTitle>
-              <Calendar className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {summary.leaveDays}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Week Off Days</CardTitle>
-              <Calendar className="h-4 w-4 text-yellow-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">
-                {summary.weekOffDays}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-              <Clock className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {summary.totalHoursLabel}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-
-  <Card className="shadow-sm border-0">
-          <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Filter by Date</CardTitle>
+      {/* Statistics Grid */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <Card className="border shadow-sm bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Present Days</CardTitle>
+            <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="grid gap-1 text-sm">
-                <span>Start Date</span>
-                <input
-                  type="date"
-                  className="border rounded px-2 py-1 text-sm bg-background"
-                  value={filterStart}
-                  max={todayStr}
-                  onChange={(e) => setFilterStart(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-1 text-sm">
-                <span>End Date</span>
-                <input
-                  type="date"
-                  className="border rounded px-2 py-1 text-sm bg-background"
-                  value={filterEnd}
-                  max={todayStr}
-                  onChange={(e) => setFilterEnd(e.target.value)}
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  type="button"
-                  className="px-4 py-2 rounded bg-primary text-primary-foreground text-sm w-full sm:w-auto"
-                  onClick={() => {
-                    if (!filterStart || !filterEnd) {
-                      toast.error("Please select both start and end dates.");
-                      return;
-                    }
-                    if (filterStart > filterEnd) {
-                      toast.error("Start date cannot be after end date.");
-                      return;
-                    }
-                    const today = todayStr;
-                    const end = filterEnd > today ? today : filterEnd;
-                    setStartDate(filterStart);
-                    setEndDate(end);
-                    setCurrentPage(1);
-                  }}
-                >
-                  Apply
-                </button>
-              </div>
-            </div>
+            <div className="text-2xl font-bold text-foreground">{summary.presentDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Total worked days</p>
           </CardContent>
         </Card>
 
-
-        <Card className="shadow-lg border-0">
-          <CardHeader>
-            <CardTitle className="text-lg sm:text-xl">Attendance History</CardTitle>
+        <Card className="border shadow-sm bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Leave Days</CardTitle>
+            <Calendar className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="rounded-md border overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("date")}
-                    >
-                      Date
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("checkIn")}
-                    >
-                      Check-In
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("checkOut")}
-                    >
-                      Check-Out
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("hours")}
-                    >
-                      Total Hours
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("mode")}
-                    >
-                      Mode
-                    </TableHead>
-                    <TableHead
-                      className="cursor-pointer"
-                      onClick={() => handleSort("status")}
-                    >
-                      Status
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loading && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-sm">
-                        Loading attendance...
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {!loading && error && rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-sm">
-                        {error}
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {!loading && !error && rows.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-6 text-sm">
-                        No attendance records found.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                  {!loading &&
-                    !error &&
-                    paginatedRows.map((row) => (
-                      <TableRow key={row.id}>
-                        <TableCell>{row.date}</TableCell>
-                        <TableCell>{row.checkInLabel}</TableCell>
-                        <TableCell>{row.checkOutLabel}</TableCell>
-                        <TableCell>{row.totalLabel}</TableCell>
-                        <TableCell>{row.workMode}</TableCell>
-                        <TableCell>
-                          {row.status === "Present" && (
-                            <span className="text-green-600">Present</span>
-                          )}
-                          {row.status === "Leave" && (
-                            <span className="text-red-600">Leave</span>
-                          )}
-                          {row.status === "Week Off" && (
-                            <span className="text-yellow-600">Week Off</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                </TableBody>
-              </Table>
-            </div>
-            {rows.length > 0 && (
-              <div className="flex items-center justify-between mt-4 text-xs sm:text-sm">
-                <div>
-                  Page {current} of {totalPages}
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="px-2 py-1 rounded border text-xs disabled:opacity-50"
-                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                    disabled={current === 1}
-                  >
-                    Prev
-                  </button>
-                  <button
-                    type="button"
-                    className="px-2 py-1 rounded border text-xs disabled:opacity-50"
-                    onClick={() =>
-                      setCurrentPage((p) => Math.min(totalPages, p + 1))
-                    }
-                    disabled={current === totalPages}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
+            <div className="text-2xl font-bold text-foreground">{summary.leaveDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Excluding holidays</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Week Offs</CardTitle>
+            <Calendar className="h-4 w-4 text-yellow-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{summary.weekOffDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Standard weekends</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Holidays</CardTitle>
+            <Palmtree className="h-4 w-4 text-blue-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{summary.holidayDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Company holidays</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
+            <Clock className="h-4 w-4 text-primary" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-foreground">{summary.totalHoursLabel}</div>
+            <p className="text-xs text-muted-foreground mt-1">Calculate work time</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Filters Section */}
+      <Card className="border shadow-sm bg-card">
+        <CardHeader className="pb-3 border-b">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-primary" />
+            Custom Date Filter
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row items-end gap-4">
+            <div className="grid gap-2 flex-1 w-full">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Start Date</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="date"
+                  className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  value={filterStart}
+                  max={todayStr}
+                  onChange={(e) => setFilterStart(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker()}
+                />
+              </div>
+            </div>
+            <div className="grid gap-2 flex-1 w-full">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">End Date</label>
+              <div className="relative">
+                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <input
+                  type="date"
+                  className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                  value={filterEnd}
+                  max={todayStr}
+                  onChange={(e) => setFilterEnd(e.target.value)}
+                  onClick={(e) => e.currentTarget.showPicker()}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <Button
+                type="button"
+                className="flex-1 md:flex-none px-6 h-[42px] shadow-sm"
+                onClick={() => {
+                  if (!filterStart || !filterEnd) {
+                    toast.error("Please select both start and end dates.");
+                    return;
+                  }
+                  if (filterStart > filterEnd) {
+                    toast.error("Start date cannot be after end date.");
+                    return;
+                  }
+                  setStartDate(filterStart);
+                  setEndDate(filterEnd);
+                  setCurrentPage(1);
+                }}
+              >
+                Apply Filter
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-[42px] w-[42px] border-border hover:bg-muted"
+                onClick={resetFilters}
+                title="Reset Filters"
+              >
+                <RotateCcw className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Attendance History Table */}
+      <Card className="border shadow-sm bg-card overflow-hidden">
+        <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="text-lg font-semibold">Attendance History</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1">Showing records from {startDate} to {endDate}</p>
+          </div>
+          <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+            {rows.length} Records
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-transparent">
+                  <TableHead className="w-[150px] font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("date")}>
+                    <div className="flex items-center justify-center gap-2">Date {sortKey === "date" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("checkIn")}>
+                    <div className="flex items-center justify-center gap-2">Check-In {sortKey === "checkIn" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("checkOut")}>
+                    <div className="flex items-center justify-center gap-2">Check-Out {sortKey === "checkOut" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("hours")}>
+                    <div className="flex items-center justify-center gap-2">Hours Worked {sortKey === "hours" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("mode")}>
+                    <div className="flex items-center justify-center gap-2">Mode {sortKey === "mode" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                  <TableHead className="font-semibold text-foreground cursor-pointer text-center" onClick={() => handleSort("status")}>
+                    <div className="flex items-center justify-center gap-2">Status {sortKey === "status" && (sortDir === "asc" ? "↑" : "↓")}</div>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                        <span className="text-muted-foreground font-medium">Fetching records...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : error && rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center">
+                      <div className="text-destructive font-medium">{error}</div>
+                    </TableCell>
+                  </TableRow>
+                ) : rows.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-40 text-center">
+                      <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                        <Calendar className="h-10 w-10 opacity-20" />
+                        <span className="font-medium">No records found for the selected period.</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedRows.map((row) => (
+                    <TableRow key={row.id} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                      <TableCell className="font-medium text-foreground text-center">
+                        {new Date(row.date).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Clock className="h-3.5 w-3.5 opacity-60" />
+                          {row.checkInLabel}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <Clock className="h-3.5 w-3.5 opacity-60" />
+                          {row.checkOutLabel}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
+                          {row.totalLabel}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-center">
+                        {row.workMode === "Office" ? (
+                          <Badge variant="outline" className="font-normal">Office</Badge>
+                        ) : row.workMode === "WFH" ? (
+                          <Badge variant="outline" className="font-normal">Remote</Badge>
+                        ) : (
+                          <span className="opacity-60">{row.workMode}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">{getStatusBadge(row.status)}</TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination Controls */}
+          {!loading && rows.length > 0 && (
+            <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card">
+              <div className="text-sm text-muted-foreground">
+                Showing <span className="font-semibold text-foreground">{start + 1}</span> to{" "}
+                <span className="font-semibold text-foreground">{Math.min(start + pageSize, rows.length)}</span> of{" "}
+                <span className="font-semibold text-foreground">{rows.length}</span> records
+              </div>
+              
+              <div className="flex items-center gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={current === 1}
+                  className="h-8 px-2"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) pageNum = i + 1;
+                    else if (current <= 3) pageNum = i + 1;
+                    else if (current >= totalPages - 2) pageNum = totalPages - 4 + i;
+                    else pageNum = current - 2 + i;
+                    
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={current === pageNum ? "default" : "outline"}
+                        size="sm"
+                        className={`h-8 w-8 p-0 ${current === pageNum ? "shadow-sm" : ""}`}
+                        onClick={() => setCurrentPage(pageNum)}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={current === totalPages}
+                  className="h-8 px-2"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

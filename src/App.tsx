@@ -1,7 +1,7 @@
 import { Provider } from "react-redux";
 import { Suspense, lazy } from "react";
 import { store } from "@/store";
-import { Toaster as Sonner, Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ui/theme-provider";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -10,7 +10,7 @@ import SessionTimeoutManager from "@/components/layout/SessionTimeoutManager";
 
 const AuthPage = lazy(() =>
   import("@/pages/Auth").then((m) => ({ default: m.Auth }))
-);
+);  
 const DashboardLayoutLazy = lazy(() =>
   import("@/components/layout/DashboardLayout").then((m) => ({
     default: m.DashboardLayout,
@@ -102,6 +102,11 @@ const ProfileManagementLazy = lazy(() =>
     default: m.ProfileManagement,
   }))
 );
+const EmployeeHolidaysLazy = lazy(() =>
+  import("@/pages/employee/Holidays").then((m) => ({
+    default: m.EmployeeHolidays,
+  }))
+);
 const NotFoundLazy = lazy(() => import("@/pages/NotFound"));
 const ForgotPasswordLazy = lazy(() =>
   import("@/pages/ForgotPassword").then((m) => ({
@@ -122,7 +127,6 @@ const App = () => (
       <ThemeProvider defaultTheme="system" storageKey="ems-ui-theme">
         <TooltipProvider>
           <Toaster />
-          <Sonner />
           <HashRouter>
             <SessionTimeoutManager />
             <Suspense fallback={<div className="p-4">Loading...</div>}>
@@ -169,11 +173,11 @@ const App = () => (
                     element={<EmployeeAttendanceDetailsLazy />}
                   />
                   <Route
-                    path="office-location"
-                    element={<OfficeLocationPageLazy />}
-                  />
-                  <Route path="weekoff" element={<AdminAccessLazy />} />
-                </Route>
+                  path="office-location"
+                  element={<OfficeLocationPageLazy />}
+                />
+                <Route path="weekoff" element={<AdminAccessLazy />} />
+              </Route>
 
                 <Route
                   path="/owner"
@@ -215,6 +219,10 @@ const App = () => (
                     element={<AttendanceTrackingLazy />}
                   />
                   <Route path="leave" element={<LeaveManagementLazy />} />
+                  <Route
+                    path="holidays"
+                    element={<EmployeeHolidaysLazy />}
+                  />
                   <Route
                     path="profile"
                     element={<ProfileManagementLazy />}

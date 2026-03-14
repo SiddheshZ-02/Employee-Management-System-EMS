@@ -1,9 +1,52 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardFooter,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Calendar as CalendarIcon,
+  Plus,
+  Edit,
+  Trash2,
+  Settings2,
+  CalendarDays,
+  Save,
+  Loader2,
+} from "lucide-react";
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/api";
+import { format, parseISO, isPast, startOfDay } from "date-fns";
+import {
+  setHolidays,
+  addHoliday,
+  updateHolidayInState,
+  removeHoliday,
+  setLoading as setHolidayLoading,
+  setError as setHolidayError,
+  type Holiday,
+} from "@/store/slices/holidaySlice";
 
 const weekdayOptions = [
   { value: 0, label: "Sunday" },
@@ -17,57 +60,45 @@ const weekdayOptions = [
 
 export const AdminAccess = () => {
   const { token } = useAppSelector((state) => state.auth);
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const { holidays, loading: holidayLoading } = useAppSelector((state) => state.holiday);
+  const dispatch = useAppDispatch();
 
-  useEffect(() => {
-    const fetchConfig = async () => {
-      if (!token) {
-        return;
+  // Week Off State
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
+  const [weekOffLoading, setWeekOffLoading] = useState(false);
+  const [savingWeekOff, setSavingWeekOff] = useState(false);
+
+  // Holiday State
+  const [isHolidayDialogOpen, setIsHolidayDialogOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
+  const [holidayForm, setHolidayForm] = useState({
+    name: "",
+    date: "",
+    description: "",
+  });
+
+  // --- Week Off Handlers ---
+  const fetchWeekOffConfig = useCallback(async () => {
+    if (!token) return;
+    try {
+      setWeekOffLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/admin/weekoff`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && data.config && Array.isArray(data.config.daysOfWeek)) {
+        setSelectedDays(data.config.daysOfWeek.map(Number));
       }
-      try {
-        setLoading(true);
-        const res = await fetch(`${API_BASE_URL}/api/admin/weekoff`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        if (!res.ok) {
-          return;
-        }
-        const data: { success?: boolean; config?: { daysOfWeek?: number[] } } = await res.json();
-        if (data.success && data.config && Array.isArray(data.config.daysOfWeek)) {
-          setSelectedDays(
-            data.config.daysOfWeek
-              .map((d) => Number(d))
-              .filter((d) => Number.isInteger(d) && d >= 0 && d <= 6)
-          );
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchConfig();
+    } finally {
+      setWeekOffLoading(false);
+    }
   }, [token]);
 
-  const toggleDay = (day: number) => {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
-  };
-
-  const handleSave = async () => {
-    if (!token) {
-      toast({
-        title: "Not authenticated",
-        description: "Please log in again as admin.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const handleSaveWeekOff = async () => {
+    if (!token) return;
     try {
-      setSaving(true);
+      setSavingWeekOff(true);
       const res = await fetch(`${API_BASE_URL}/api/admin/weekoff`, {
         method: "PUT",
         headers: {
@@ -76,89 +107,371 @@ export const AdminAccess = () => {
         },
         body: JSON.stringify({ daysOfWeek: selectedDays }),
       });
-      if (!res.ok) {
-        toast({
-          title: "Error",
-          description: "Failed to update week off configuration.",
-          variant: "destructive",
-        });
-        return;
+      if (res.ok) {
+        toast({ title: "Success", description: "Week off configuration updated." });
       }
-      const data: { success?: boolean } = await res.json();
-      if (!data.success) {
-        toast({
-          title: "Error",
-          description: "Unexpected response while updating configuration.",
-          variant: "destructive",
-        });
-        return;
-      }
-      toast({
-        title: "Saved",
-        description: "Week off configuration updated.",
-      });
-    } catch {
-      toast({
-        title: "Error",
-        description: "Network error while saving configuration.",
-        variant: "destructive",
-      });
     } finally {
-      setSaving(false);
+      setSavingWeekOff(false);
     }
   };
 
-  return (
-    <div className="w-full min-h-full bg-background">
-      <div className="w-full h-full p-4 md:p-6 lg:p-8">
-        <div className="space-y-6 w-full">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold">Admin Access</h2>
-              <p className="text-muted-foreground">
-                Configure company-wide weekly off days for attendance.
-              </p>
-            </div>
-          </div>
+  const toggleDay = (day: number) => {
+    setSelectedDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  };
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Weekly Off Days</CardTitle>
-              <CardDescription>
-                Select which days of the week are considered week off for all employees.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="py-6 text-sm text-muted-foreground">Loading configuration...</div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                    {weekdayOptions.map((day) => {
-                      const active = selectedDays.includes(day.value);
-                      return (
-                        <Button
-                          key={day.value}
-                          type="button"
-                          variant={active ? "default" : "outline"}
-                          className="justify-center"
-                          onClick={() => toggleDay(day.value)}
-                        >
-                          {day.label}
-                        </Button>
-                      );
-                    })}
-                  </div>
-                  <Button onClick={handleSave} disabled={saving}>
-                    {saving ? "Saving..." : "Save Changes"}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
+  // --- Holiday Handlers ---
+  const fetchHolidays = useCallback(async () => {
+    if (!token) return;
+    dispatch(setHolidayLoading(true));
+    try {
+      const data = await apiRequest<{ success: boolean; holidays: Holiday[] }>("/api/admin/holidays", {
+        token,
+      });
+      if (data.success) {
+        dispatch(setHolidays(data.holidays));
+      }
+    } catch (err: any) {
+      dispatch(setHolidayError(err.message));
+    }
+  }, [token, dispatch]);
+
+  useEffect(() => {
+    fetchWeekOffConfig();
+    fetchHolidays();
+  }, [fetchWeekOffConfig, fetchHolidays]);
+
+  const handleOpenHolidayDialog = (holiday: Holiday | null = null) => {
+    if (holiday) {
+      setEditingHoliday(holiday);
+      setHolidayForm({
+        name: holiday.name,
+        date: holiday.date,
+        description: holiday.description || "",
+      });
+    } else {
+      setEditingHoliday(null);
+      setHolidayForm({
+        name: "",
+        date: "",
+        description: "",
+      });
+    }
+    setIsHolidayDialogOpen(true);
+  };
+
+  const handleHolidaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!token) return;
+
+    const selectedDate = parseISO(holidayForm.date);
+    if (isPast(selectedDate) && startOfDay(selectedDate) < startOfDay(new Date())) {
+      if (!window.confirm("This date is in the past. Proceed?")) return;
+    }
+
+    if (holidays.some(h => h.date === holidayForm.date && (!editingHoliday || h._id !== editingHoliday._id))) {
+      toast({ title: "Error", description: "Holiday already exists on this date.", variant: "destructive" });
+      return;
+    }
+
+    try {
+      const payload = {
+        ...holidayForm,
+      };
+
+      if (editingHoliday) {
+        const data = await apiRequest<{ success: boolean; holiday: Holiday }>(`/api/admin/holidays/${editingHoliday._id}`, {
+          method: "PUT",
+          body: payload,
+          token,
+        });
+        if (data.success) dispatch(updateHolidayInState(data.holiday));
+      } else {
+        const data = await apiRequest<{ success: boolean; holiday: Holiday }>("/api/admin/holidays", {
+          method: "POST",
+          body: payload,
+          token,
+        });
+        if (data.success) dispatch(addHoliday(data.holiday));
+      }
+      setIsHolidayDialogOpen(false);
+      toast({ title: "Success", description: `Holiday ${editingHoliday ? "updated" : "added"} successfully.` });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleDeleteHoliday = async (id: string) => {
+    if (!token || !window.confirm("Delete this holiday?")) return;
+    try {
+      const data = await apiRequest<{ success: boolean }>(`/api/admin/holidays/${id}`, {
+        method: "DELETE",
+        token,
+      });
+      if (data.success) {
+        dispatch(removeHoliday(id));
+        toast({ title: "Deleted", description: "Holiday removed successfully." });
+      }
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const groupedHolidays = useMemo(() => {
+    const groups: Record<string, Holiday[]> = {};
+    holidays.forEach((h) => {
+      const monthYear = format(parseISO(h.date), "MMMM yyyy");
+      if (!groups[monthYear]) groups[monthYear] = [];
+      groups[monthYear].push(h);
+    });
+    return groups;
+  }, [holidays]);
+
+  return (
+    <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-4xl font-extrabold tracking-tight text-foreground flex items-center gap-3">
+            <Settings2 className="h-9 w-9 text-primary" />
+            Admin Settings
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Configure organizational policies, schedules, and holiday calendars.
+          </p>
         </div>
       </div>
+
+      <Tabs defaultValue="holidays" className="w-full">
+        <div className="flex items-center justify-between mb-8 border-b pb-1">
+          <TabsList className="bg-transparent h-auto p-0 gap-8 rounded-none border-b-0">
+            <TabsTrigger 
+              value="holidays" 
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 pt-0 text-base font-semibold transition-all hover:text-primary"
+            >
+              <CalendarDays className="h-4 w-4 mr-2" />
+              Company Holidays
+            </TabsTrigger>
+            <TabsTrigger 
+              value="weekoff" 
+              className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-primary border-b-2 border-transparent rounded-none px-2 pb-3 pt-0 text-base font-semibold transition-all hover:text-primary"
+            >
+              <Settings2 className="h-4 w-4 mr-2" />
+              Week Off Config
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="weekoff" className="mt-0 focus-visible:ring-0">
+          <Card className="border shadow-xl overflow-hidden">
+            <div className="bg-primary/5 px-6 py-4 border-b">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <CalendarDays className="h-5 w-5 text-primary" />
+                Working Schedule
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Define standard non-working days for all employees in the organization.
+              </CardDescription>
+            </div>
+            <CardContent className="p-8">
+              {weekOffLoading ? (
+                <div className="flex flex-col items-center justify-center p-12 space-y-4">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary/40" />
+                  <p className="text-sm text-muted-foreground">Loading configuration...</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-6">
+                  {weekdayOptions.map((day) => {
+                    const isActive = selectedDays.includes(day.value);
+                    return (
+                      <div
+                        key={day.value}
+                        onClick={() => toggleDay(day.value)}
+                        className={`
+                          group relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all duration-300 select-none
+                          ${isActive 
+                            ? "border-primary bg-primary/5 shadow-md ring-4 ring-primary/10" 
+                            : "border-muted hover:border-primary/30 hover:bg-muted/30"}
+                        `}
+                      >
+                        <span className={`text-xs font-black uppercase tracking-widest mb-3 ${isActive ? "text-primary" : "text-muted-foreground"}`}>
+                          {day.label.substring(0, 3)}
+                        </span>
+                        <div className={`
+                          h-10 w-10 rounded-full flex items-center justify-center transition-all duration-300
+                          ${isActive ? "bg-primary text-primary-foreground scale-110" : "bg-muted text-muted-foreground"}
+                        `}>
+                          {isActive ? <Save className="h-5 w-5" /> : <div className="h-2 w-2 rounded-full bg-current" />}
+                        </div>
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Checkbox checked={isActive} className="rounded-full h-4 w-4" />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+            <CardFooter className="bg-muted/30 px-8 py-6 flex justify-between items-center border-t">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Settings2 className="h-4 w-4" />
+                {selectedDays.length} days selected as non-working
+              </div>
+              <Button 
+                onClick={handleSaveWeekOff} 
+                disabled={savingWeekOff} 
+                className="px-8 shadow-lg shadow-primary/20 transition-all hover:scale-105"
+              >
+                {savingWeekOff ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Changes
+              </Button>
+            </CardFooter>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="holidays" className="mt-0 focus-visible:ring-0">
+          <div className="space-y-8">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-bold tracking-tight">Holiday Calendar</h2>
+                <p className="text-muted-foreground">Schedule upcoming company-wide holidays and observances.</p>
+              </div>
+              <Button 
+                onClick={() => handleOpenHolidayDialog()}
+                className="shadow-lg shadow-primary/20 hover:scale-105 transition-all"
+              >
+                <Plus className="mr-2 h-4 w-4" /> Add New Holiday
+              </Button>
+            </div>
+
+            {holidayLoading && holidays.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-24 space-y-4">
+                <Loader2 className="h-12 w-12 animate-spin text-primary/40" />
+                <p className="text-muted-foreground font-medium">Fetching your holiday list...</p>
+              </div>
+            ) : holidays.length === 0 ? (
+              <Card className="border-dashed border-2 bg-muted/20">
+                <CardContent className="flex flex-col items-center justify-center p-20 text-center">
+                  <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mb-6">
+                    <CalendarIcon className="h-10 w-10 text-muted-foreground opacity-50" />
+                  </div>
+                  <h3 className="text-xl font-bold mb-2">No holidays scheduled</h3>
+                  <p className="text-muted-foreground max-w-xs mb-8">
+                    Keep your team informed about upcoming time off by scheduling holidays.
+                  </p>
+                  <Button onClick={() => handleOpenHolidayDialog()} variant="outline" className="border-2">
+                    <Plus className="mr-2 h-4 w-4" /> Create First Holiday
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-10">
+                {Object.entries(groupedHolidays).map(([monthYear, monthHolidays]) => (
+                  <div key={monthYear} className="space-y-6">
+                    <div className="flex items-center gap-4">
+                      <h3 className="text-lg font-bold text-foreground whitespace-nowrap">
+                        {monthYear}
+                      </h3>
+                      <div className="h-px bg-muted w-full" />
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {monthHolidays.map((holiday) => (
+                        <Card key={holiday._id} className="group relative overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-card">
+                          <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+                          <CardHeader className="pb-4">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1.5">
+                                <CardTitle className="text-lg font-bold group-hover:text-primary transition-colors">
+                                  {holiday.name}
+                                </CardTitle>
+                                <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+                                  <CalendarIcon className="mr-1.5 h-3 w-3" />
+                                  {format(parseISO(holiday.date), "PPP")}
+                                </div>
+                              </div>
+                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-y-1 group-hover:translate-y-0">
+                                <Button 
+                                  variant="secondary" 
+                                  size="icon" 
+                                  className="h-8 w-8 rounded-full shadow-sm" 
+                                  onClick={() => handleOpenHolidayDialog(holiday)}
+                                >
+                                  <Edit className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="destructive" 
+                                  size="icon" 
+                                  className="h-8 w-8 rounded-full shadow-sm" 
+                                  onClick={() => handleDeleteHoliday(holiday._id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed italic">
+                              {holiday.description || "Official organization holiday."}
+                            </p>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Holiday Dialog */}
+      <Dialog open={isHolidayDialogOpen} onOpenChange={setIsHolidayDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{editingHoliday ? "Edit Holiday" : "Add New Holiday"}</DialogTitle>
+            <DialogDescription>
+              Set up a company holiday for your employees.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleHolidaySubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Holiday Name *</Label>
+              <Input
+                id="name"
+                value={holidayForm.name}
+                onChange={(e) => setHolidayForm({ ...holidayForm, name: e.target.value })}
+                placeholder="e.g., Independence Day"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">Date *</Label>
+              <Input
+                id="date"
+                type="date"
+                value={holidayForm.date}
+                onChange={(e) => setHolidayForm({ ...holidayForm, date: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={holidayForm.description}
+                onChange={(e) => setHolidayForm({ ...holidayForm, description: e.target.value })}
+                placeholder="Details about the holiday..."
+                rows={3}
+              />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsHolidayDialogOpen(false)}>Cancel</Button>
+              <Button type="submit">{editingHoliday ? "Update Holiday" : "Create Holiday"}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
-

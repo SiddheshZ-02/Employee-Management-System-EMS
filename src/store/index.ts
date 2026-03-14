@@ -5,6 +5,7 @@ import departmentSlice from "./slices/departmentSlice";
 import attendanceSlice from "./slices/attendanceSlice";
 import leaveSlice from "./slices/leaveSlice";
 import adminSlice from "./slices/adminSlice";
+import holidaySlice from "./slices/holidaySlice";
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     attendance: attendanceSlice,
     leave: leaveSlice,
     admin: adminSlice,
+    holiday: holidaySlice,
   },
 });
 

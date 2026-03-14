@@ -14,6 +14,7 @@ import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { setDepartments } from "@/store/slices/departmentSlice";
 import { API_BASE_URL } from "@/constant/Config";
+import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 
 const AttendanceTrendChartLazy = lazy(() =>
   import("@/components/ui/charts").then((m) => ({
@@ -291,6 +292,10 @@ export const AdminDashboard = () => {
                 </div>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="grid gap-6 grid-cols-1">
+            <UpcomingHolidaysWidget />
           </div>
 
           {/* Analytics Charts */}
