@@ -1,6 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { type LeaveRequest } from "@/store/slices/leaveSlice";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { 
+  type LeaveRequest, 
+  type LeaveType, 
+  type EmployeeLeaveBalance,
+  setLeaveTypes,
+  setEmployeeLeaveBalances
+} from "@/store/slices/leaveSlice";
 import {
   Card,
   CardContent,
@@ -48,195 +55,193 @@ import { Plus, X, CalendarDays, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { API_BASE_URL } from "@/constant/Config";
+import { apiRequest } from "@/lib/api";
 
 interface LeaveFormData {
-  type: "vacation" | "sick" | "casual" | "other";
+  leaveTypeId: string;
   startDate: string;
   endDate: string;
   reason: string;
+  payType: "paid" | "unpaid";
 }
 
 const LeaveManagement = () => {
+  const dispatch = useAppDispatch();
   const { user, token } = useAppSelector((state) => state.auth);
-  const { balances } = useAppSelector((state) => state.leave);
+  const { leaveTypes, employeeLeaveBalances } = useAppSelector((state) => state.leave);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [leave, setLeave] = useState<LeaveRequest[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
   const form = useForm<LeaveFormData>({
     defaultValues: {
-      type: "vacation",
+      leaveTypeId: "",
       startDate: "",
       endDate: "",
       reason: "",
+      payType: "paid",
     },
   });
 
-  const fetchLeave = useCallback(async () => {
+  const selectedStartDate = form.watch("startDate");
+  const selectedEndDate = form.watch("endDate");
+  const selectedLeaveTypeId = form.watch("leaveTypeId");
+  
+  const calculateDays = (start: string, end: string) => {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
+    const diff = e.getTime() - s.getTime();
+    return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
+  };
+
+  const requestedDays = calculateDays(selectedStartDate, selectedEndDate);
+
+  const getRemainingDays = (typeId: string) => {
+    const balance = employeeLeaveBalances.find(b => {
+      const bTypeId = b.leaveTypeId?._id || b.leaveTypeId?.id || b.leaveTypeId;
+      return bTypeId === typeId;
+    });
+    return balance ? balance.remainingDays : 0;
+  };
+
+  const hasEnoughBalance = (typeId: string, days: number) => {
+    return getRemainingDays(typeId) >= days;
+  };
+
+  // Automatically suggest payment type based on balance
+  useEffect(() => {
+    if (selectedLeaveTypeId) {
+      const remaining = getRemainingDays(selectedLeaveTypeId);
+      if (remaining <= 0) {
+        // Force unpaid if no balance
+        form.setValue("payType", "unpaid");
+      } else if (requestedDays > 0 && remaining < requestedDays) {
+        // Suggest unpaid if balance is not enough for requested days
+        form.setValue("payType", "unpaid");
+      } else if (!form.getValues("payType")) {
+        // Default to paid if balance is enough and no selection made
+        form.setValue("payType", "paid");
+      }
+    }
+  }, [selectedLeaveTypeId, requestedDays, employeeLeaveBalances, form]);
+
+  const fetchData = useCallback(async () => {
     try {
       if (!token) return;
 
-      const response = await fetch(`${API_BASE_URL}/api/leave/my-requests`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const [typesRes, balancesRes, requestsRes] = await Promise.all([
+        apiRequest<{ success: boolean; leaveTypes: LeaveType[] }>("/api/leave/types", { token }),
+        apiRequest<{ success: boolean; balances: EmployeeLeaveBalance[] }>("/api/leave/balances", { token }),
+        apiRequest<{ success: boolean; leaveRequests: any[] }>("/api/leave/my-requests", { token })
+      ]);
 
-      if (!response.ok) {
-        return;
+      if (typesRes.success) dispatch(setLeaveTypes(typesRes.leaveTypes));
+      if (balancesRes.success) dispatch(setEmployeeLeaveBalances(balancesRes.balances));
+      
+      if (requestsRes.success && Array.isArray(requestsRes.leaveRequests)) {
+        const mapped: LeaveRequest[] = requestsRes.leaveRequests.map((r) => ({
+          id: r._id,
+          employeeId: r.userId,
+          employeeName: user?.name || "",
+          type: r.leaveType,
+          startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
+          endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
+          days: r.totalDays || 0,
+          reason: r.reason,
+          payType: r.payType || "paid",
+          status: r.status.charAt(0).toUpperCase() + r.status.slice(1),
+          submittedAt: r.createdAt || "",
+          approvedByName: r.approvedBy?.name || "",
+          approvedByEmail: r.approvedBy?.email || "",
+        }));
+        setLeaveRequests(mapped);
       }
-
-      const res = (await response.json()) as {
-        success: boolean;
-        leaveRequests: {
-          _id: string;
-          userId: string;
-          startDate: string;
-          endDate: string;
-          totalDays?: number;
-          reason: string;
-          leaveType: string;
-          status: string;
-          createdAt?: string;
-          approvedBy?: {
-            name?: string;
-            email?: string;
-          } | null;
-        }[];
-      };
-
-      if (!res.success || !Array.isArray(res.leaveRequests)) {
-        return;
-      }
-
-      const mapped: LeaveRequest[] = res.leaveRequests.map((r) => ({
-
-        id: r._id,
-        employeeId: r.userId,
-        employeeName: user?.name || "",
-        type:
-          r.leaveType === "vacation"
-            ? "Vacation"
-            : r.leaveType === "sick"
-            ? "Sick"
-            : r.leaveType === "casual"
-            ? "Casual"
-            : "Other",
-        startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
-        endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
-        days: r.totalDays || 0,
-        reason: r.reason,
-        status:
-          r.status === "approved"
-            ? "Approved"
-            : r.status === "rejected"
-            ? "Rejected"
-            : r.status === "cancelled"
-            ? "Rejected"
-            : "Pending",
-        submittedAt: r.createdAt || "",
-        approvedByName: r.approvedBy?.name || "",
-        approvedByEmail: r.approvedBy?.email || "",
-      }));
-
-      setLeave(mapped);
-    } catch {
-      console.error(
-        "Error fetching leave data:",
-        new Error("Failed to fetch leave data")
-      );
+    } catch (error) {
+      console.error("Error fetching leave data:", error);
     }
-  }, [token, user?.name]);
+  }, [token, user?.name, dispatch]);
 
   useEffect(() => {
-    fetchLeave();
-  }, [fetchLeave]);
+    fetchData();
+  }, [fetchData]);
 
-  // Submit leave request to API
   const onSubmit = async (data: LeaveFormData) => {
-    if (!token) {
-      toast({
-        title: "Not authenticated",
-        description: "Please log in again to submit a leave request.",
-        variant: "destructive",
-      });
-      return;
+    if (!token) return;
+    
+    // Final check for payType to ensure consistency with balance
+    let finalPayType = data.payType;
+    const remaining = getRemainingDays(data.leaveTypeId);
+    if (remaining <= 0) {
+      finalPayType = "unpaid";
+    } else if (finalPayType === "paid" && requestedDays > 0 && remaining < requestedDays) {
+      // If user still has 'paid' selected but requested more days than available
+      // we could either force it to unpaid or let the backend handle it.
+      // Given the user's feedback, forcing to unpaid if balance is 0 is most important.
     }
 
-    const startDate = new Date(data.startDate);
-    const endDate = new Date(data.endDate);
-    const days =
-      Math.ceil(
-        (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)
-      ) + 1;
-
     try {
-      const leaveType = data.type;
-
-      const response = await fetch(`${API_BASE_URL}/api/leave/request`, {
+      const res = await apiRequest<{ success: boolean; message: string }>("/api/leave/request", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+        body: {
           startDate: data.startDate,
           endDate: data.endDate,
           reason: data.reason,
-          leaveType,
-        }),
+          leaveTypeId: data.leaveTypeId,
+          payType: finalPayType,
+        },
+        token
       });
-      if (response.ok) {
+
+      if (res.success) {
         toast({
           title: "Leave Request Submitted",
-          description: `Your ${data.type.toLowerCase()} request for ${days} days has been submitted for approval.`,
+          description: "Your request has been submitted for approval.",
         });
         form.reset();
         setDialogOpen(false);
-        fetchLeave();
-      } else {
-        toast({ title: "Failed to submit leave request" });
+        fetchData();
       }
-    } catch {
-      toast({ title: "Error submitting leave request" });
+    } catch (error: any) {
+      toast({ 
+        title: "Failed to submit leave request",
+        description: error.message || "An error occurred",
+        variant: "destructive"
+      });
     }
   };
 
   const handleCancel = async (requestId: string) => {
+    if (!token) return;
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/leave/request/${requestId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
-          },
-        }
-      );
-      if (response.ok) {
+      const res = await apiRequest<{ success: boolean }>("/api/leave/request/" + requestId, {
+        method: "DELETE",
+        token
+      });
+      if (res.success) {
         toast({
           title: "Leave Request Cancelled",
           description: "Your leave request has been cancelled successfully.",
         });
-        fetchLeave();
-      } else {
-        toast({ title: "Failed to cancel leave request" });
+        fetchData();
       }
-    } catch {
-      toast({ title: "Error cancelling leave request" });
+    } catch (error: any) {
+      toast({ 
+        title: "Failed to cancel leave request",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
   const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "Approved":
+    switch (status.toLowerCase()) {
+      case "approved":
         return "default";
-      case "Rejected":
+      case "rejected":
         return "destructive";
-      case "Pending":
+      case "pending":
         return "secondary";
       default:
         return "outline";
@@ -244,24 +249,19 @@ const LeaveManagement = () => {
   };
 
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case "Vacation":
-        return "text-blue-600";
-      case "Sick":
-        return "text-red-600";
-      case "Casual":
-        return "text-green-600";
-      case "Other":
-        return "text-purple-600";
-      default:
-        return "text-gray-600";
-    }
+    const t = type.toLowerCase();
+    if (t.includes('sick')) return "text-red-600";
+    if (t.includes('casual')) return "text-green-600";
+    if (t.includes('vacation') || t.includes('earned')) return "text-blue-600";
+    return "text-purple-600";
   };
 
-  const pendingLeave = leave.filter((r) => r.status === "Pending");
-  const approvedLeave = leave.filter((r) => r.status === "Approved");
-  const [activeTab, setActiveTab] = useState<"Pending" | "Approved">("Pending");
-  const activeList = activeTab === "Pending" ? pendingLeave : approvedLeave;
+  const [statusFilter, setStatusFilter] = useState<string>("All");
+
+  const filteredRequests = leaveRequests.filter((r) => {
+    if (statusFilter === "All") return true;
+    return r.status.toLowerCase() === statusFilter.toLowerCase();
+  });
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -300,14 +300,14 @@ const LeaveManagement = () => {
                   >
                     <FormField
                       control={form.control}
-                      name="type"
+                      name="leaveTypeId"
                       rules={{ required: "Leave type is required" }}
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Leave Type</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -315,13 +315,61 @@ const LeaveManagement = () => {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="vacation">Vacation</SelectItem>
-                              <SelectItem value="sick">Sick Leave</SelectItem>
-                              <SelectItem value="casual">Casual</SelectItem>
-                              <SelectItem value="other">Other</SelectItem>
+                              {leaveTypes.filter(t => t.isActive).map(type => (
+                                <SelectItem key={type._id || type.id} value={type._id || type.id || ""}>
+                                  {type.name}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="payType"
+                      rules={{ required: "Payment type is required" }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Payment Type</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                            disabled={!selectedLeaveTypeId}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select payment type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem 
+                                value="paid" 
+                                disabled={selectedLeaveTypeId ? getRemainingDays(selectedLeaveTypeId) <= 0 : false}
+                              >
+                                Paid Leave
+                              </SelectItem>
+                              <SelectItem value="unpaid">Unpaid Leave</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                          {selectedLeaveTypeId && (
+                            <div className="space-y-1 mt-1">
+                              {getRemainingDays(selectedLeaveTypeId) <= 0 ? (
+                                <p className="text-xs text-amber-600 flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Insufficient balance. Only unpaid leave available.
+                                </p>
+                              ) : requestedDays > 0 && getRemainingDays(selectedLeaveTypeId) < requestedDays && (
+                                <p className="text-xs text-amber-600 flex items-center gap-1">
+                                  <AlertCircle className="h-3 w-3" />
+                                  Not enough balance for {requestedDays} days. Suggesting unpaid leave.
+                                </p>
+                              )}
+                            </div>
+                          )}
                         </FormItem>
                       )}
                     />
@@ -335,7 +383,17 @@ const LeaveManagement = () => {
                           <FormItem>
                             <FormLabel>Start Date</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                onClick={(e) => {
+                                  try {
+                                    e.currentTarget.showPicker();
+                                  } catch (err) {
+                                    console.debug("showPicker not supported or failed", err);
+                                  }
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -350,7 +408,17 @@ const LeaveManagement = () => {
                           <FormItem>
                             <FormLabel>End Date</FormLabel>
                             <FormControl>
-                              <Input type="date" {...field} />
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                onClick={(e) => {
+                                  try {
+                                    e.currentTarget.showPicker();
+                                  } catch (err) {
+                                    console.debug("showPicker not supported or failed", err);
+                                  }
+                                }}
+                              />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -398,41 +466,46 @@ const LeaveManagement = () => {
 
           {/* Leave Balance Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {Object.entries(balances).map(([type, balance]) => (
+            {employeeLeaveBalances.map((balance) => (
               <Card
-                key={type}
+                key={balance._id || balance.id}
                 className="hover-lift transition-smooth border-border/50"
               >
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-medium text-muted-foreground capitalize truncate">
-                    {type} Leave
+                    {balance.leaveTypeId?.name || "Leave"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="text-2xl font-bold text-foreground">
-                        {balance.remaining}
+                        {balance.remainingDays}
                       </div>
                       <div className="text-xs text-muted-foreground truncate">
-                        of {balance.total} days
+                        of {balance.allocatedDays} days
                       </div>
                     </div>
                     <CalendarDays
-                      className={`h-5 w-5 ${getTypeColor(type)} shrink-0`}
+                      className={`h-5 w-5 ${getTypeColor(balance.leaveTypeId?.name || "")} shrink-0`}
                     />
                   </div>
                   <div className="mt-3 w-full bg-secondary rounded-full h-2">
                     <div
                       className="bg-primary h-2 rounded-full transition-all duration-300"
                       style={{
-                        width: `${(balance.remaining / balance.total) * 100}%`,
+                        width: `${(balance.remainingDays / balance.allocatedDays) * 100}%`,
                       }}
                     />
                   </div>
                 </CardContent>
               </Card>
             ))}
+            {employeeLeaveBalances.length === 0 && (
+              <div className="col-span-full py-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">
+                No leave balances allocated for the current year.
+              </div>
+            )}
           </div>
 
           {/* Leave Requests */}
@@ -442,58 +515,44 @@ const LeaveManagement = () => {
                 <div>
                   <CardTitle>My Leave Requests</CardTitle>
                   <CardDescription>
-                    View your pending and approved leave requests.
+                    View your pending, approved, and rejected leave requests.
                   </CardDescription>
                 </div>
-                <div className="inline-flex items-center rounded-md border border-border/60 p-1 bg-background">
-                  <Button
-                    type="button"
-                    variant={activeTab === "Pending" ? "default" : "ghost"}
-                    size="sm"
-                    className="px-3"
-                    onClick={() => setActiveTab("Pending")}
-                  >
-                    Pending
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={activeTab === "Approved" ? "default" : "ghost"}
-                    size="sm"
-                    className="px-3"
-                    onClick={() => setActiveTab("Approved")}
-                  >
-                    Approved
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-muted-foreground">Filter:</span>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger className="w-[150px] h-9">
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Requests</SelectItem>
+                      <SelectItem value="Pending">Pending</SelectItem>
+                      <SelectItem value="Approved">Approved</SelectItem>
+                      <SelectItem value="Rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {activeList.length > 0 ? (
+              {filteredRequests.length > 0 ? (
                 <div className="rounded-lg border overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead className="whitespace-nowrap">Type</TableHead>
+                        <TableHead className="whitespace-nowrap">Pay Type</TableHead>
                         <TableHead className="whitespace-nowrap">Dates</TableHead>
                         <TableHead className="whitespace-nowrap">Days</TableHead>
                         <TableHead className="whitespace-nowrap">Status</TableHead>
-                        <TableHead className="whitespace-nowrap">
-                          {activeTab === "Pending" ? "Submitted" : "Approved On"}
+                        <TableHead className="whitespace-nowrap">Submitted</TableHead>
+                        <TableHead className="text-right whitespace-nowrap">
+                          Actions
                         </TableHead>
-                        {activeTab === "Approved" && (
-                          <TableHead className="whitespace-nowrap">
-                            Approved By
-                          </TableHead>
-                        )}
-                        {activeTab === "Pending" && (
-                          <TableHead className="text-right whitespace-nowrap">
-                            Actions
-                          </TableHead>
-                        )}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {activeList.map((request) => (
+                      {filteredRequests.map((request) => (
                           <TableRow key={request.id}>
                             <TableCell>
                               <div className="flex items-center space-x-2">
@@ -506,6 +565,11 @@ const LeaveManagement = () => {
                                   {request.type}
                                 </span>
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {request.payType}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
@@ -538,15 +602,8 @@ const LeaveManagement = () => {
                                   : "N/A"}
                               </span>
                             </TableCell>
-                            {activeTab === "Approved" && (
-                              <TableCell>
-                                <span className="text-sm text-muted-foreground truncate">
-                                  {request.approvedByName || "N/A"}
-                                </span>
-                              </TableCell>
-                            )}
-                            {activeTab === "Pending" && (
-                              <TableCell className="text-right">
+                            <TableCell className="text-right">
+                              {request.status.toLowerCase() === "pending" && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -555,8 +612,8 @@ const LeaveManagement = () => {
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
-                              </TableCell>
-                            )}
+                              )}
+                            </TableCell>
                           </TableRow>
                         )
                       )}
@@ -566,9 +623,9 @@ const LeaveManagement = () => {
               ) : (
                 <div className="text-center space-y-4 py-8 text-sm text-muted-foreground">
                   <p>
-                    {activeTab === "Pending"
-                      ? "No pending leave requests."
-                      : "No approved leave requests yet."}
+                    {statusFilter === "All" 
+                      ? "No leave requests found." 
+                      : `No ${statusFilter.toLowerCase()} leave requests found.`}
                   </p>
                 </div>
               )}

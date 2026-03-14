@@ -61,6 +61,7 @@ interface AdminLeaveRequest {
   endDate: string;
   days: number;
   reason: string;
+  payType: "paid" | "unpaid";
   status: LeaveStatus;
   submittedAt?: string;
   approvedByName?: string;
@@ -144,6 +145,7 @@ export const AdminLeaveRequests = () => {
           endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
           days: r.totalDays || 0,
           reason: r.reason || "",
+          payType: r.payType || "paid",
           status: r.status as LeaveStatus,
           submittedAt: r.createdAt,
           approvedByName: r.approvedBy?.name,
@@ -199,7 +201,7 @@ export const AdminLeaveRequests = () => {
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/admin/leave-requests/${selectedRequest.id}`,
+        `${API_BASE_URL}/api/leave/request/${selectedRequest.id}/status`,
         {
           method: "PUT",
           headers: {
@@ -208,7 +210,7 @@ export const AdminLeaveRequests = () => {
           },
           body: JSON.stringify({
             status,
-            adminComment,
+            rejectionReason: adminComment,
           }),
         }
       );
@@ -334,6 +336,9 @@ export const AdminLeaveRequests = () => {
                             Type
                           </TableHead>
                           <TableHead className="whitespace-nowrap">
+                            Pay Type
+                          </TableHead>
+                          <TableHead className="whitespace-nowrap">
                             Dates
                           </TableHead>
                           <TableHead className="whitespace-nowrap">
@@ -371,6 +376,11 @@ export const AdminLeaveRequests = () => {
                                 {request.type.charAt(0).toUpperCase() +
                                   request.type.slice(1)}
                               </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">
+                                {request.payType}
+                              </Badge>
                             </TableCell>
                             <TableCell>
                               <div className="text-sm">
@@ -581,7 +591,9 @@ export const AdminLeaveRequests = () => {
                       {selectedRequest.startDate} – {selectedRequest.endDate} (
                       {selectedRequest.days} days,{" "}
                       {selectedRequest.type.charAt(0).toUpperCase() +
-                        selectedRequest.type.slice(1)}
+                        selectedRequest.type.slice(1)},{" "}
+                      {selectedRequest.payType.charAt(0).toUpperCase() +
+                        selectedRequest.payType.slice(1)}
                       )
                     </div>
                     <div className="text-xs text-muted-foreground">

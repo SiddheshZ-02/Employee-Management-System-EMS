@@ -71,6 +71,21 @@ const AdminAccessLazy = lazy(() =>
     default: m.AdminAccess,
   }))
 );
+const CompanyHolidaysLazy = lazy(() =>
+  import("@/pages/admin/CompanyHolidays").then((m) => ({
+    default: m.CompanyHolidays,
+  }))
+);
+const CompanyWeekOffLazy = lazy(() =>
+  import("@/pages/admin/CompanyWeekOff").then((m) => ({
+    default: m.CompanyWeekOff,
+  }))
+);
+const LeaveAllocationLazy = lazy(() =>
+  import("@/pages/admin/LeaveAllocation").then((m) => ({
+    default: m.LeaveAllocation,
+  }))
+);
 const EmployeeAttendanceDetailsLazy = lazy(() =>
   import("@/pages/admin/EmployeeAttendanceDetails").then((m) => ({
     default: m.EmployeeAttendanceDetails,
@@ -176,7 +191,10 @@ const App = () => (
                   path="office-location"
                   element={<OfficeLocationPageLazy />}
                 />
-                <Route path="weekoff" element={<AdminAccessLazy />} />
+                <Route path="access" element={<AdminAccessLazy />} />
+                <Route path="holidays" element={<CompanyHolidaysLazy />} />
+                <Route path="weekoff" element={<CompanyWeekOffLazy />} />
+                <Route path="leave-allocation" element={<LeaveAllocationLazy />} />
               </Route>
 
                 <Route

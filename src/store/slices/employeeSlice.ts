@@ -3,7 +3,8 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 
 export interface Employee {
-  id: string;
+  id?: string;
+  _id?: string;
   name: string;
   email: string;
   employeeId: string;
@@ -84,7 +85,7 @@ const employeeSlice = createSlice({
     },
     updateEmployee: (state, action: PayloadAction<Employee>) => {
       const index = state.employees.findIndex(
-        (emp) => emp.id === action.payload.id
+        (emp) => (emp._id || emp.id) === (action.payload._id || action.payload.id)
       );
       if (index !== -1) {
         state.employees[index] = action.payload;
@@ -92,7 +93,7 @@ const employeeSlice = createSlice({
     },
     deleteEmployee: (state, action: PayloadAction<string>) => {
       state.employees = state.employees.filter(
-        (emp) => emp.id !== action.payload
+        (emp) => (emp._id || emp.id) !== action.payload
       );
     },
   },

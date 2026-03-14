@@ -34,8 +34,14 @@ export async function apiRequest<T = unknown>(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(errorText || "Request failed");
+    let errorMessage = "Request failed";
+    try {
+      const errorJson = await response.json();
+      errorMessage = errorJson.message || errorMessage;
+    } catch (e) {
+      errorMessage = (await response.text()) || errorMessage;
+    }
+    throw new Error(errorMessage);
   }
 
   return (await response.json()) as T;

@@ -59,7 +59,7 @@ export const EmployeeDashboard = () => {
     const loadData = async () => {
       try {
         const todayStr = new Date().toISOString().split("T")[0];
-        const [todayRes, historyRes, leaveRes, activityRes, holidayRes] = await Promise.all(
+        const [todayRes, historyRes, leaveRes, balanceRes, activityRes, holidayRes] = await Promise.all(
           [
             fetch(`${API_BASE_URL}/api/attendance/today`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -72,6 +72,9 @@ export const EmployeeDashboard = () => {
                 Authorization: `Bearer ${token}`,
                 "Content-Type": "application/json",
               },
+            }),
+            fetch(`${API_BASE_URL}/api/leave/balances`, {
+              headers: { Authorization: `Bearer ${token}` },
             }),
             fetch(`${API_BASE_URL}/api/activity/today?date=${todayStr}`, {
               headers: { Authorization: `Bearer ${token}` },
@@ -126,10 +129,18 @@ export const EmployeeDashboard = () => {
         if (leaveRes.ok) {
           const leaveJson = await leaveRes.json();
           if (leaveJson.success && leaveJson.summary) {
-            const approvedDays = leaveJson.summary.totalApprovedDays || 0;
-            const totalAllowance = 24;
-            const remaining = totalAllowance - approvedDays;
-            setLeaveBalance(remaining > 0 ? remaining : 0);
+            // Summary is handled differently now with actual balances
+          }
+        }
+
+        if (balanceRes.ok) {
+          const balanceJson = await balanceRes.json();
+          if (balanceJson.success && Array.isArray(balanceJson.balances)) {
+            const totalRemaining = balanceJson.balances.reduce(
+              (sum: number, b: any) => sum + (b.remainingDays || 0),
+              0
+            );
+            setLeaveBalance(totalRemaining);
           }
         }
 

@@ -375,7 +375,13 @@ const AttendanceTracking = () => {
                   value={filterStart}
                   max={todayStr}
                   onChange={(e) => setFilterStart(e.target.value)}
-                  onClick={(e) => e.currentTarget.showPicker()}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) {
+                      console.debug("showPicker not supported or failed", err);
+                    }
+                  }}
                 />
               </div>
             </div>
@@ -389,7 +395,13 @@ const AttendanceTracking = () => {
                   value={filterEnd}
                   max={todayStr}
                   onChange={(e) => setFilterEnd(e.target.value)}
-                  onClick={(e) => e.currentTarget.showPicker()}
+                  onClick={(e) => {
+                    try {
+                      e.currentTarget.showPicker();
+                    } catch (err) {
+                      console.debug("showPicker not supported or failed", err);
+                    }
+                  }}
                 />
               </div>
             </div>

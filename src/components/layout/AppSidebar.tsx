@@ -63,7 +63,7 @@ const adminNavItems = [
   },
   {
     title: 'Admin Access',
-    url: '/admin/weekoff',
+    url: '/admin/access',
     icon: Calendar,
   },
 ];
