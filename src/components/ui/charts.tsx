@@ -70,7 +70,7 @@ interface DepartmentData {
 }
 
 // Enhanced AttendanceTrendChart with real data
-export const AttendanceTrendChart = ({ department }: { department?: string }) => {
+export const AttendanceTrendChart = () => {
   const [attendanceData, setAttendanceData] = useState<MonthlyData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,28 +89,19 @@ export const AttendanceTrendChart = ({ department }: { department?: string }) =>
 
   const processMonthlyAttendance = useCallback((
     attendance: AttendanceRecord[],
-    employees: Employee[],
-    deptFilter?: string
+    employees: Employee[]
   ): MonthlyData[] => {
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
     const currentYear = new Date().getFullYear();
     
-    const filteredEmployees = deptFilter 
-      ? employees.filter(emp => emp.department === deptFilter && emp.status === "Active")
-      : employees.filter((emp) => emp.status === "Active");
+    const activeEmployees = employees.filter((emp) => emp.status === "Active");
       
-    const totalEmployees = filteredEmployees.length;
-    const filteredEmpIds = new Set(filteredEmployees.map(emp => emp.id));
+    const totalEmployees = activeEmployees.length;
 
     return months.map((month, index) => {
       const monthAttendance = attendance.filter((record) => {
         const recordDate = new Date(record.date);
-        const isCorrectMonth = recordDate.getFullYear() === currentYear && recordDate.getMonth() === index;
-        
-        if (deptFilter) {
-          return isCorrectMonth && record.userId && filteredEmpIds.has(record.userId._id);
-        }
-        return isCorrectMonth;
+        return recordDate.getFullYear() === currentYear && recordDate.getMonth() === index;
       });
 
       const presentDays = monthAttendance.filter((record) => record.status === "checked-out").length;
@@ -155,7 +146,7 @@ export const AttendanceTrendChart = ({ department }: { department?: string }) =>
           status: emp.isActive ? "Active" : "Inactive",
         }));
 
-        const monthlyData = processMonthlyAttendance(attendance, employees, department);
+        const monthlyData = processMonthlyAttendance(attendance, employees);
         setAttendanceData(monthlyData);
       } catch (err) {
         setError("Failed to load attendance data");
@@ -166,7 +157,7 @@ export const AttendanceTrendChart = ({ department }: { department?: string }) =>
     };
 
     fetchAttendanceData();
-  }, [department, token, processMonthlyAttendance]);
+  }, [token, processMonthlyAttendance]);
 
   if (loading) return <Skeleton className="h-[300px] w-full" />;
   if (error) return <p className="text-destructive p-4">{error}</p>;

@@ -1,11 +1,10 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -22,13 +21,22 @@ import {
   User,
   LogOut,
   ClipboardList,
+  ChevronRight,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logoutAsync } from '@/store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { API_BASE_URL } from '@/constant/Config';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const adminNavItems = [
   {
@@ -112,8 +120,7 @@ const ownerNavItems = [
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
-  // const location = useLocation();
-  // const currentPath = location.pathname;
+  const location = useLocation();
   const { user, token } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -177,9 +184,6 @@ export function AppSidebar() {
       : user?.role === 'Owner'
       ? ownerNavItems
       : employeeNavItems;
-  // const isActived = (path: string) => currentPath === path;
-  const getNavClass = ({ isActive }: { isActive: boolean }) =>
-    `sidebar-item ${isActive ? 'sidebar-item-active' : 'sidebar-item-inactive'}`;
 
   const handleLogout = async () => {
     await dispatch(logoutAsync());
@@ -191,91 +195,146 @@ export function AppSidebar() {
   };
 
   return (
-    <Sidebar className={`bg-gradient-sidebar border-sidebar-border ${collapsed ? 'w-14' : 'w-64'}`}>
-      <SidebarHeader className="border-b border-sidebar-border p-3 sm:p-4">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-sidebar-primary flex-shrink-0">
-            <h6 className='text-sidebar-primary-foreground text-sm sm:text-lg font-bold'>EMS</h6>
+    <Sidebar className={cn(
+      "border-r border-sidebar-border transition-all duration-300 ease-in-out bg-card",
+      collapsed ? "w-[70px]" : "w-[260px]"
+    )}>
+      <TooltipProvider delayDuration={0}>
+        <SidebarHeader className="h-[70px] border-b border-sidebar-border/50 px-4 flex items-center justify-center">
+          <div className="flex items-center gap-3 w-full">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 flex-shrink-0 transition-transform duration-300 hover:scale-110">
+              <span className="text-lg font-black tracking-tighter">EMS</span>
+            </div>
+            {!collapsed && (
+              <div className="flex flex-col min-w-0 overflow-hidden animate-in fade-in slide-in-from-left-4 duration-300">
+                <span className="text-sm font-bold text-foreground leading-none mb-1">
+                  EMS Portal
+                </span>
+                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+                  {user?.role} Workspace
+                </span>
+              </div>
+            )}
           </div>
-          {!collapsed && (
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs sm:text-sm font-semibold text-sidebar-foreground truncate">
-                Employee Management System
-              </span>
-            </div>
-          )}
-        </div>
-      </SidebarHeader>
+        </SidebarHeader>
 
-      <SidebarContent className="px-2 py-4">
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/90 text-xs font-medium mb-2">
-            {/* {!collapsed && 'Navigation'} */}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {navItems.map((item) => {
-                const isLeaveRequests = item.title === 'Leave Requests';
-                const showBadge =
-                  isLeaveRequests && pendingLeaves !== null && pendingLeaves > 0;
+        <SidebarContent className="px-3 py-6 scrollbar-hide overflow-y-auto">
+          <SidebarGroup className="p-0">
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1.5">
+                {navItems.map((item) => {
+                  const isActive = location.pathname === item.url;
+                  const isLeaveRequests = item.title === 'Leave Requests';
+                  const showBadge = isLeaveRequests && pendingLeaves !== null && pendingLeaves > 0;
 
-                return (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <NavLink to={item.url} className={getNavClass}>
-                        <item.icon className="h-4 w-4 flex-shrink-0" />
-                        {!collapsed && (
-                          <span className="flex items-center gap-2 min-w-0">
-                            <span className="truncate">{item.title}</span>
-                            {showBadge && (
-                              <span className="inline-flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] px-1.5 py-0.5">
-                                {pendingLeaves > 99 ? '99+' : pendingLeaves}
+                  const menuItem = (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild tooltip={item.title}>
+                        <NavLink
+                          to={item.url}
+                          className={cn(
+                            "group relative flex items-center h-11 px-3 rounded-lg transition-all duration-200 ease-in-out",
+                            isActive 
+                              ? "bg-accent text-primary-foreground shadow-md shadow-primary/25" 
+                              : "text-muted-foreground hover:bg-primary/10 hover:text-primary hover:shadow-sm"
+                          )}
+                        >
+                          <item.icon className={cn(
+                            "h-[18px] w-[18px] flex-shrink-0 transition-transform duration-200 group-hover:scale-110",
+                            isActive ? "text-accent-foreground" : "text-muted-foreground group-hover:text-primary"
+                          )} />
+                          
+                          {!collapsed && (
+                            <div className="flex items-center justify-between flex-1 ml-3 min-w-0 animate-in fade-in slide-in-from-left-2 duration-300">
+                              <span className="text-sm font-semibold truncate">
+                                {item.title}
                               </span>
-                            )}
-                          </span>
-                        )}
-                      </NavLink>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+                              
+                              <div className="flex items-center gap-2">
+                                {showBadge && (
+                                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 animate-pulse shadow-sm shadow-destructive/20">
+                                    {pendingLeaves > 99 ? '99+' : pendingLeaves}
+                                  </span>
+                                )}
+                                {isActive && (
+                                  <ChevronRight className="h-3 w-3 opacity-60" />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {isActive && collapsed && (
+                            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-primary-foreground rounded-l-full shadow-glow" />
+                          )}
+                        </NavLink>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
 
-      {/* User Profile & Logout */}
-      <div className="mt-auto border-t border-sidebar-border p-3 sm:p-4">
-        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-          <Avatar className="h-6 w-6 sm:h-8 sm:w-8 flex-shrink-0">
-            <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
-              {user?.name ? getUserInitials(user.name) : 'U'}
-            </AvatarFallback>
-          </Avatar>
-          {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-sidebar-foreground truncate">
-                {user?.name}
-              </p>
-              <p className="text-xs text-sidebar-foreground/70 truncate">
-                {user?.email}
-              </p>
+                  if (collapsed) {
+                    return (
+                      <Tooltip key={item.title}>
+                        <TooltipTrigger asChild>
+                          {menuItem}
+                        </TooltipTrigger>
+                        <TooltipContent side="right" sideOffset={10} className="font-semibold text-xs">
+                          {item.title}
+                          {showBadge && ` (${pendingLeaves} pending)`}
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  }
+
+                  return menuItem;
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <div className="mt-auto border-t border-sidebar-border/50 p-4 space-y-4">
+          <div className={cn(
+            "flex items-center gap-3",
+            collapsed ? "justify-center" : "px-1"
+          )}>
+            <div className="relative group cursor-pointer">
+              <Avatar className="h-9 w-9 border-2 border-background shadow-sm transition-transform group-hover:scale-105">
+                <AvatarImage src="" />
+                <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
+                  {user?.name ? getUserInitials(user.name) : 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 bg-emerald-500 border-2 border-background rounded-full" />
             </div>
-          )}
+            
+            {!collapsed && (
+              <div className="flex flex-col min-w-0 flex-1 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <p className="text-sm font-bold text-foreground truncate leading-tight">
+                  {user?.name}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate font-medium">
+                  {user?.email}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex flex-col gap-2">
+            <Button
+              variant="destructive"
+              size={collapsed ? "icon" : "sm"}
+              onClick={handleLogout}
+              className={cn(
+                "w-full font-bold shadow-md shadow-destructive/10 transition-all duration-200 active:scale-95 hover:bg-destructive/90 hover:shadow-destructive/20",
+                collapsed ? "h-10 w-10 p-0" : "h-9 text-xs justify-start gap-3"
+              )}
+            >
+              <LogOut className={cn("h-4 w-4", !collapsed && "ml-0")} />
+              {!collapsed && <span>Logout</span>}
+            </Button>
+          </div>
         </div>
-        
-        <Button
-          variant="default"
-          size="sm"
-          onClick={handleLogout}
-          className={`bg-grey-900 hover:bg-red-500 focus-visible:ring ring-gray-300 text-black shadow-md hover:shadow-glow transition-smooth w-full text-xs sm:text-sm ${
-            collapsed ? 'px-1 sm:px-2' : ''
-          }`}
-        >
-          <LogOut className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-          {!collapsed && <span className="ml-1 sm:ml-2 truncate">Logout</span>}
-        </Button>
-      </div>
+      </TooltipProvider>
     </Sidebar>
   );
 }

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import React, { Suspense, lazy, useEffect, useState } from "react";
 import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Cake, Calendar as CalendarIcon, Sparkles, Filter } from "lucide-react";
+import { Cake, Calendar as CalendarIcon, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
@@ -17,16 +17,9 @@ import { setDepartments } from "@/store/slices/departmentSlice";
 import { setHolidays } from "@/store/slices/holidaySlice";
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 const AttendanceTrendChartLazy = lazy<
-  React.ComponentType<{ department?: string }>
+  React.ComponentType<object>
 >(() =>
   import("@/components/ui/charts").then((m) => ({
     default: m.AttendanceTrendChart,
@@ -74,7 +67,6 @@ interface BackendDepartment {
 
 export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
-  const { departments } = useAppSelector((state) => state.departments);
   const { employees } = useAppSelector((state) => state.employees);
   const { user, token } = useAppSelector((state) => state.auth);
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<
@@ -86,7 +78,6 @@ export const AdminDashboard = () => {
       daysUntil: number;
     }[]
   >([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
 
   useEffect(() => {
     if (!token) {
@@ -214,18 +205,9 @@ export const AdminDashboard = () => {
                     </div>
                     <span>Upcoming Birthdays</span>
                   </CardTitle>
-                  {upcomingBirthdays.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="font-medium bg-pink-500/5 text-pink-600 border-pink-500/10"
-                    >
-                      {upcomingBirthdays.length} events
-                    </Badge>
-                  )}
+                 
                 </div>
-                <CardDescription>
-                  Birthdays within the next 10 days
-                </CardDescription>
+              
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
                 {upcomingBirthdays.length > 0 ? (
@@ -296,11 +278,7 @@ export const AdminDashboard = () => {
                           ? "No colleagues found"
                           : "No upcoming birthdays"}
                       </p>
-                      <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
-                        {employees.length === 0
-                          ? "We couldn't find any team members in your organization."
-                          : "There are no birthdays scheduled for the next 10 days."}
-                      </p>
+                     
                     </div>
                   </div>
                 )}
@@ -329,13 +307,7 @@ export const AdminDashboard = () => {
                     <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
                   }
                 >
-                  <AttendanceTrendChartLazy
-                    department={
-                      selectedDepartment === "all"
-                        ? undefined
-                        : selectedDepartment
-                    }
-                  />
+                  <AttendanceTrendChartLazy />
                 </Suspense>
               </div>
               <div className="w-full min-w-0">

@@ -572,18 +572,9 @@ export const EmployeeDashboard = () => {
                     </div>
                     <span>Upcoming Birthdays</span>
                   </CardTitle>
-                  {upcomingBirthdays.length > 0 && (
-                    <Badge
-                      variant="secondary"
-                      className="font-medium bg-pink-500/5 text-pink-600 border-pink-500/10"
-                    >
-                      {upcomingBirthdays.length} events
-                    </Badge>
-                  )}
+                
                 </div>
-                <CardDescription>
-                  Birthdays within the next 10 days
-                </CardDescription>
+             
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
                 {upcomingBirthdays.length > 0 ? (
@@ -654,11 +645,7 @@ export const EmployeeDashboard = () => {
                           ? "No colleagues found"
                           : "No upcoming birthdays"}
                       </p>
-                      <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
-                        {employees.length === 0
-                          ? "We couldn't find any team members in your organization."
-                          : "There are no birthdays scheduled for the next 10 days."}
-                      </p>
+                     
                     </div>
                   </div>
                 )}
