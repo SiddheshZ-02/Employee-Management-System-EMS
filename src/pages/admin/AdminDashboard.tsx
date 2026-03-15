@@ -6,11 +6,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Suspense, lazy } from "react";
+import React, { Suspense, lazy, useEffect, useState } from "react";
 import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Cake, Calendar as CalendarIcon, Sparkles } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Cake, Calendar as CalendarIcon, Sparkles, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
@@ -18,20 +17,24 @@ import { setDepartments } from "@/store/slices/departmentSlice";
 import { setHolidays } from "@/store/slices/holidaySlice";
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-const AttendanceTrendChartLazy = lazy(() =>
+const AttendanceTrendChartLazy = lazy<
+  React.ComponentType<{ department?: string }>
+>(() =>
   import("@/components/ui/charts").then((m) => ({
     default: m.AttendanceTrendChart,
   }))
 );
-const DepartmentDistributionChartLazy = lazy(() =>
+const DepartmentDistributionChartLazy = lazy<React.ComponentType<object>>(() =>
   import("@/components/ui/charts").then((m) => ({
     default: m.DepartmentDistributionChart,
-  }))
-);
-const WeeklyAttendanceChartLazy = lazy(() =>
-  import("@/components/ui/charts").then((m) => ({
-    default: m.WeeklyAttendanceChart,
   }))
 );
 
@@ -74,7 +77,16 @@ export const AdminDashboard = () => {
   const { departments } = useAppSelector((state) => state.departments);
   const { employees } = useAppSelector((state) => state.employees);
   const { user, token } = useAppSelector((state) => state.auth);
-  const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState<
+    {
+      id: string;
+      name: string;
+      department: string;
+      birthdayDate: string;
+      daysUntil: number;
+    }[]
+  >([]);
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("all");
 
   useEffect(() => {
     if (!token) {
@@ -122,10 +134,7 @@ export const AdminDashboard = () => {
 
         if (birthdaysRes.ok) {
           const birthdaysJson = await birthdaysRes.json();
-          if (
-            birthdaysJson.success &&
-            Array.isArray(birthdaysJson.birthdays)
-          ) {
+          if (birthdaysJson.success && Array.isArray(birthdaysJson.birthdays)) {
             setUpcomingBirthdays(birthdaysJson.birthdays);
           }
         }
@@ -301,72 +310,41 @@ export const AdminDashboard = () => {
 
           {/* Analytics Charts */}
           <div className="space-y-4 sm:space-y-6">
-            <div className="space-y-2">
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground">
-                Real-time Analytics & Insights
-              </h3>
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                Live data from your organization's attendance and department
-                systems
-              </p>
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+              <div className="space-y-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-foreground">
+                  Real-time Analytics & Insights
+                </h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
+                  Live data from your organization's attendance and department
+                  systems
+                </p>
+              </div>
             </div>
 
-            <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 xl:grid-cols-2">
+            <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 md:grid-cols-2">
               <div className="w-full min-w-0">
                 <Suspense
                   fallback={
-                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle className="text-sm sm:text-base">
-                          Loading attendance trends...
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
-                      </CardContent>
-                    </Card>
+                    <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
                   }
                 >
-                  <AttendanceTrendChartLazy />
+                  <AttendanceTrendChartLazy
+                    department={
+                      selectedDepartment === "all"
+                        ? undefined
+                        : selectedDepartment
+                    }
+                  />
                 </Suspense>
               </div>
               <div className="w-full min-w-0">
                 <Suspense
                   fallback={
-                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle className="text-sm sm:text-base">
-                          Loading department distribution...
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
-                      </CardContent>
-                    </Card>
+                    <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
                   }
                 >
                   <DepartmentDistributionChartLazy />
-                </Suspense>
-              </div>
-            </div>
-
-            <div className="grid gap-3 sm:gap-4 md:gap-6">
-              <div className="w-full min-w-0">
-                <Suspense
-                  fallback={
-                    <Card className="hover-lift transition-smooth border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle className="text-sm sm:text-base">
-                          Loading weekly attendance...
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="h-[300px] w-full animate-pulse rounded-md bg-muted" />
-                      </CardContent>
-                    </Card>
-                  }
-                >
-                  <WeeklyAttendanceChartLazy />
                 </Suspense>
               </div>
             </div>

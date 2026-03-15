@@ -78,7 +78,6 @@ export const EmployeeDashboard = () => {
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
 
   const [hoursToday, setHoursToday] = useState("0h 0m");
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [leaveBalance, setLeaveBalance] = useState(0);
   const [monthAttendance, setMonthAttendance] = useState<{
     attended: number;
@@ -88,7 +87,6 @@ export const EmployeeDashboard = () => {
     totalDays: 0,
   });
   const [activities, setActivities] = useState<any[]>([]);
-  const [isLoadingActivities, setIsLoadingActivities] = useState(true);
 
   const filteredActivities = useMemo(() => {
     const today = new Date();
@@ -117,10 +115,6 @@ export const EmployeeDashboard = () => {
     const loadData = async () => {
       try {
         const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        const todayStr = `${year}-${month}-${day}`;
 
         const responses = await Promise.allSettled([
           fetch(`${API_BASE_URL}/api/attendance/today`, {
@@ -210,7 +204,6 @@ export const EmployeeDashboard = () => {
             } else {
               setHoursToday("0h 0m");
             }
-            setIsCheckedIn(todayJson.hasCheckedIn && !todayJson.hasCheckedOut);
           }
         }
 
@@ -306,8 +299,6 @@ export const EmployeeDashboard = () => {
         }
       } catch {
         return;
-      } finally {
-        setIsLoadingActivities(false);
       }
     };
     loadData();
@@ -319,12 +310,6 @@ export const EmployeeDashboard = () => {
 
     const interval = setInterval(async () => {
       try {
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = String(now.getMonth() + 1).padStart(2, "0");
-        const day = String(now.getDate()).padStart(2, "0");
-        const todayStr = `${year}-${month}-${day}`;
-
         const [todayRes, historyRes, activityRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/attendance/today`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -341,7 +326,6 @@ export const EmployeeDashboard = () => {
           const data = await todayRes.json();
           if (data.success && data.stats && data.stats.totalHours) {
             setHoursToday(data.stats.totalHours);
-            setIsCheckedIn(data.hasCheckedIn && !data.hasCheckedOut);
           }
         }
 
