@@ -54,7 +54,6 @@ import { useForm } from "react-hook-form";
 import { Plus, X, CalendarDays, AlertCircle, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { API_BASE_URL } from "@/constant/Config";
 import { apiRequest } from "@/lib/api";
 
 interface LeaveFormData {
@@ -115,10 +114,6 @@ const LeaveManagement = () => {
       return bTypeId === typeId;
     });
     return balance ? balance.remainingDays : 0;
-  };
-
-  const hasEnoughBalance = (typeId: string, days: number) => {
-    return getRemainingDays(typeId) >= days;
   };
 
   // Automatically suggest payment type based on balance

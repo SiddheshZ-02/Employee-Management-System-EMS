@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
-import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Info } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { toast } from "sonner";
@@ -14,8 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/constant/Config";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest } from "@/lib/api";
-import { format, isWithinInterval, parseISO, startOfDay } from "date-fns";
 import {
   Tooltip,
   TooltipContent,
@@ -95,8 +93,6 @@ const AttendanceTracking = () => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
-  const [leaves, setLeaves] = useState<any[]>([]);
-  const [holidays, setHolidays] = useState<any[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalDays: 0,
     presentDays: 0,

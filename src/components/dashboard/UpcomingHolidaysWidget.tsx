@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Calendar as CalendarIcon, ChevronRight, PartyPopper, Sparkles } from "lucide-react";
+import { Calendar as CalendarIcon, PartyPopper, Sparkles } from "lucide-react";
 import { format, parseISO, isAfter, startOfDay, isSameDay, differenceInDays, isSameMonth } from "date-fns";
 
 const LIGHT_COLORS = [

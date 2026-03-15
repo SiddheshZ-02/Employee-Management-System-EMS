@@ -1,8 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Card,
-  CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -18,9 +16,8 @@ import {
 import { Calendar as CalendarIcon, Search } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
-import { format, parseISO, isAfter, startOfDay, addDays } from "date-fns";
+import { format, parseISO } from "date-fns";
 import { Input } from "@/components/ui/input";
-import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 
 const HOLIDAY_COLORS = [
   { 

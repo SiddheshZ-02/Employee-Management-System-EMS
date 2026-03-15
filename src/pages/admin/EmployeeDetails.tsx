@@ -12,14 +12,10 @@ import {
   Phone, 
   Building2, 
   Briefcase, 
-  Calendar, 
   User, 
-  Clock, 
-  FileText, 
   ShieldCheck, 
   ShieldAlert,
   Hash,
-  Activity,
   CalendarDays
 } from "lucide-react";
 
@@ -114,9 +110,6 @@ export const EmployeeDetails = () => {
   }
 
   const employee = data?.employee;
-  const attendance = data?.attendanceSummary;
-  const leaves = data?.pendingLeaves;
-
   if (!employee) {
     return (
       <div className="w-full min-h-full bg-background">

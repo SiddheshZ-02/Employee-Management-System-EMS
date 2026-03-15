@@ -27,7 +27,6 @@ import {
   Users,
   TrendingUp,
   AlertCircle,
-  BarChart3,
   Clock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";

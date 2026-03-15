@@ -27,15 +27,6 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import {
   Select,
   SelectContent,
   SelectItem,
@@ -43,7 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search, Check, X, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Check, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { API_BASE_URL } from "@/constant/Config";
@@ -258,9 +249,6 @@ export const AdminLeaveRequests = () => {
     if (status === "pending") return "Pending";
     return status;
   };
-
-  const startIndex = (currentPage - 1) * pageSize + 1;
-  const endIndex = startIndex + filteredRequests.length - 1;
 
   return (
     <div className="w-full min-h-full bg-background">

@@ -65,7 +65,7 @@ import { setEmployees, type Employee } from "@/store/slices/employeeSlice";
 export const LeaveAllocation = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { token, user } = useAppSelector((state) => state.auth);
+  const { token } = useAppSelector((state) => state.auth);
   const { leaveTypes } = useAppSelector((state) => state.leave);
   const { employees } = useAppSelector((state) => state.employees);
 

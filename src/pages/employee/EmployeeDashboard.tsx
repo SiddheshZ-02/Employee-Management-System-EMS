@@ -11,7 +11,6 @@ import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setHolidays } from "@/store/slices/holidaySlice";
 import { Clock, Calendar, User, CheckCircle, TrendingUp } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 import {
@@ -34,7 +33,6 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
-  ReferenceLine,
 } from "recharts";
 
 export const EmployeeDashboard = () => {

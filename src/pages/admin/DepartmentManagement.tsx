@@ -41,15 +41,6 @@ import { deleteDepartment, setDepartments, type Department } from "@/store/slice
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { API_BASE_URL } from "@/constant/Config";
 
 interface BackendDepartment {

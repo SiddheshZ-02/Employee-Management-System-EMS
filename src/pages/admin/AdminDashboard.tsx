@@ -8,7 +8,7 @@ import {
 import { Suspense, lazy } from "react";
 import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Building2, Calendar } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useEffect } from "react";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
@@ -55,7 +55,6 @@ interface BackendDepartment {
 
 export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
-  const { employees } = useAppSelector((state) => state.employees);
   const { departments } = useAppSelector((state) => state.departments);
   const { user, token } = useAppSelector((state) => state.auth);
 
