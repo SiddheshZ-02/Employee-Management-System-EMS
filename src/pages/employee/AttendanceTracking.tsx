@@ -155,7 +155,7 @@ const AttendanceTracking = () => {
           checkInLabel = Number.isNaN(d.getTime())
             ? day.checkInTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
+                hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
               });
@@ -167,7 +167,7 @@ const AttendanceTracking = () => {
           checkOutLabel = Number.isNaN(d.getTime())
             ? day.checkOutTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
+                hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
               });

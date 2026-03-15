@@ -16,7 +16,8 @@ import {
   ShieldCheck, 
   ShieldAlert,
   Hash,
-  CalendarDays
+  CalendarDays,
+  Cake
 } from "lucide-react";
 
 interface EmployeeDetailsResponse {
@@ -32,6 +33,7 @@ interface EmployeeDetailsResponse {
     isActive?: boolean;
     createdAt?: string;
     position?: string;
+    dateOfBirth?: string;
   };
   attendanceSummary?: {
     totalDays?: number;
@@ -238,6 +240,22 @@ export const EmployeeDetails = () => {
                   <div>
                     <p className="text-sm text-muted-foreground">Position</p>
                     <p className="font-bold text-base">{employee.position || employee.employeeId || "-"}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-xl border bg-card hover:bg-muted/20 transition-colors">
+                  <div className="h-10 w-10 rounded-lg bg-pink-500/10 flex items-center justify-center text-pink-500 shrink-0">
+                    <Cake className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Date of Birth</p>
+                    <p className="font-bold text-base">
+                      {employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString('en-GB', { 
+                        day: '2-digit', 
+                        month: 'short', 
+                        year: 'numeric' 
+                      }) : "Not provided"}
+                    </p>
                   </div>
                 </div>
 

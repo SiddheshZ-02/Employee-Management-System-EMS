@@ -55,6 +55,7 @@ interface BackendEmployee {
   employeeId?: string;
   position?: string;
   department?: string;
+  dateOfBirth?: string;
   createdAt?: string;
   isActive?: boolean;
 }
@@ -107,6 +108,7 @@ export const EmployeeManagement = () => {
     position: "",
     phone: "",
     department: "",
+    dateOfBirth: "",
     status: "Active" as "Active" | "Inactive",
   });
   const filteredEmployees = employees.filter(
@@ -137,6 +139,7 @@ export const EmployeeManagement = () => {
       position: "",
       phone: "",
       department: "",
+      dateOfBirth: "",
       status: "Active",
     });
     setEditingEmployee(null);
@@ -154,6 +157,7 @@ export const EmployeeManagement = () => {
       position: employee.position,
       phone: "",
       department: employee.department,
+      dateOfBirth: employee.dateOfBirth ? new Date(employee.dateOfBirth).toISOString().split('T')[0] : "",
       status: employee.status,
     });
     setIsDialogOpen(true);
@@ -171,6 +175,7 @@ export const EmployeeManagement = () => {
       position: "",
       phone: "",
       department: "",
+      dateOfBirth: "",
       status: "Active",
     });
   };
@@ -207,6 +212,7 @@ export const EmployeeManagement = () => {
         employeeId: String(emp.employeeId || ""),
         position: String(emp.position || emp.employeeId || ""),
         department: String(emp.department || ""),
+        dateOfBirth: emp.dateOfBirth,
         joinDate: emp.createdAt
           ? new Date(emp.createdAt).toISOString()
           : new Date().toISOString(),
@@ -246,6 +252,7 @@ export const EmployeeManagement = () => {
         department: formData.department,
         phone: formData.phone,
         position: formData.position,
+        dateOfBirth: formData.dateOfBirth,
       };
       const response = await fetch(`${API_BASE_URL}/api/admin/employees`, {
         method: "POST",
@@ -277,6 +284,7 @@ export const EmployeeManagement = () => {
         employeeId: String(emp.employeeId || ""),
         position: String(emp.position || emp.employeeId || ""),
         department: String(emp.department || ""),
+        dateOfBirth: emp.dateOfBirth,
         joinDate: emp.createdAt
           ? new Date(emp.createdAt).toISOString()
           : new Date().toISOString(),
@@ -307,6 +315,7 @@ export const EmployeeManagement = () => {
     employeeId: string;
     department: string;
     position: string;
+    dateOfBirth: string;
     status: "Active" | "Inactive";
   }) => {
     if (!token) {
@@ -324,6 +333,7 @@ export const EmployeeManagement = () => {
         employeeId: payload.employeeId,
         department: payload.department,
         position: payload.position,
+        dateOfBirth: payload.dateOfBirth,
         isActive: payload.status === "Active",
       };
 
@@ -360,6 +370,7 @@ export const EmployeeManagement = () => {
         employeeId: String(emp.employeeId || ""),
         position: String(emp.position || emp.employeeId || ""),
         department: String(emp.department || ""),
+        dateOfBirth: emp.dateOfBirth,
         joinDate: emp.createdAt
           ? new Date(emp.createdAt).toISOString()
           : new Date().toISOString(),
@@ -479,6 +490,7 @@ export const EmployeeManagement = () => {
         employeeId: formData.employeeId,
         department: formData.department,
         position: formData.position,
+        dateOfBirth: formData.dateOfBirth,
         status: formData.status,
       };
       fetchUpdateEmployee(updatePayload);
@@ -637,6 +649,20 @@ export const EmployeeManagement = () => {
                             </div>
                           </>
                         )}
+                        <div className="grid gap-2">
+                          <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                          <Input
+                            id="dateOfBirth"
+                            type="date"
+                            value={formData.dateOfBirth}
+                            onChange={(e) =>
+                              setFormData({
+                                ...formData,
+                                dateOfBirth: e.target.value,
+                              })
+                            }
+                          />
+                        </div>
                         <div className="grid gap-2">
                           <Label htmlFor="role">Position</Label>
                           <Input

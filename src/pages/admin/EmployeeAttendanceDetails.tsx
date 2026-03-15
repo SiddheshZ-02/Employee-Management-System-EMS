@@ -401,9 +401,9 @@ export const EmployeeAttendanceDetails = () => {
           checkIn = Number.isNaN(d.getTime())
             ? record.checkInTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
                 hour: "2-digit",
                 minute: "2-digit",
+                hour12: true,
               });
         }
 
@@ -413,7 +413,7 @@ export const EmployeeAttendanceDetails = () => {
           checkOut = Number.isNaN(d.getTime())
             ? record.checkOutTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
+                hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
               });
@@ -507,7 +507,7 @@ export const EmployeeAttendanceDetails = () => {
           checkIn = Number.isNaN(d.getTime())
             ? record.checkInTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
+                hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
               });
@@ -519,7 +519,7 @@ export const EmployeeAttendanceDetails = () => {
           checkOut = Number.isNaN(d.getTime())
             ? record.checkOutTime
             : d.toLocaleTimeString("en-IN", {
-                hour12: false,
+                hour12: true,
                 hour: "2-digit",
                 minute: "2-digit",
               });

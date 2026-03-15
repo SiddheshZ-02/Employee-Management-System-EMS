@@ -5,11 +5,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Suspense, lazy } from "react";
 import { LiveStatsCard } from "@/components/ui/charts";
 import { useAppSelector } from "@/hooks/useAppSelector";
-import { Building2 } from "lucide-react";
-import { useEffect } from "react";
+import { Cake, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { useEffect, useState } from "react";
+import { format } from "date-fns";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { setDepartments } from "@/store/slices/departmentSlice";
@@ -33,6 +35,19 @@ const WeeklyAttendanceChartLazy = lazy(() =>
   }))
 );
 
+const LIGHT_COLORS = [
+  "bg-amber-50 border-amber-100 text-amber-700",
+  "bg-cyan-50 border-cyan-100 text-cyan-700",
+  "bg-indigo-50 border-indigo-100 text-indigo-700",
+  "bg-purple-50 border-purple-100 text-purple-700",
+  "bg-emerald-50 border-emerald-100 text-emerald-700",
+  "bg-rose-50 border-rose-100 text-rose-700",
+  "bg-blue-50 border-blue-100 text-blue-700",
+];
+
+const getPastelColor = (index: number) =>
+  LIGHT_COLORS[index % LIGHT_COLORS.length];
+
 interface BackendEmployee {
   _id: string;
   name: string;
@@ -42,6 +57,7 @@ interface BackendEmployee {
   department?: string;
   createdAt?: string;
   isActive?: boolean;
+  dateOfBirth?: string;
 }
 
 interface BackendDepartment {
@@ -56,7 +72,9 @@ interface BackendDepartment {
 export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
   const { departments } = useAppSelector((state) => state.departments);
+  const { employees } = useAppSelector((state) => state.employees);
   const { user, token } = useAppSelector((state) => state.auth);
+  const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
 
   useEffect(() => {
     if (!token) {
@@ -64,17 +82,21 @@ export const AdminDashboard = () => {
     }
     const fetchData = async () => {
       try {
-        const [employeesRes, departmentsRes, holidaysRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/api/admin/employees?page=1&limit=100`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/api/admin/departments?page=1&limit=100`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch(`${API_BASE_URL}/api/holidays`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
+        const [employeesRes, departmentsRes, holidaysRes, birthdaysRes] =
+          await Promise.all([
+            fetch(`${API_BASE_URL}/api/auth/colleagues`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API_BASE_URL}/api/admin/departments?page=1&limit=100`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API_BASE_URL}/api/holidays`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            fetch(`${API_BASE_URL}/api/auth/birthdays`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ]);
 
         if (employeesRes.ok) {
           const employeesJson = await employeesRes.json();
@@ -91,9 +113,20 @@ export const AdminDashboard = () => {
                   ? new Date(emp.createdAt).toISOString()
                   : new Date().toISOString(),
                 status: emp.isActive === false ? "Inactive" : "Active",
+                dateOfBirth: emp.dateOfBirth,
               })
             );
             dispatch(setEmployees(mappedEmployees));
+          }
+        }
+
+        if (birthdaysRes.ok) {
+          const birthdaysJson = await birthdaysRes.json();
+          if (
+            birthdaysJson.success &&
+            Array.isArray(birthdaysJson.birthdays)
+          ) {
+            setUpcomingBirthdays(birthdaysJson.birthdays);
           }
         }
 
@@ -163,57 +196,105 @@ export const AdminDashboard = () => {
           <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 lg:grid-cols-2">
             <UpcomingHolidaysWidget />
 
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden flex flex-col h-[380px]">
-              <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-6 shrink-0">
-                <CardTitle className="flex items-center gap-2 text-sm sm:text-base lg:text-lg">
-                  <div className="p-1 sm:p-1.5 md:p-2 rounded-full bg-purple-500/10 shrink-0">
-                    <Building2 className="h-3 w-3 sm:h-4 sm:w-4 md:h-5 md:w-5 text-purple-600" />
-                  </div>
-                  <span className="truncate text-xs sm:text-sm md:text-base">
-                    Department Overview
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-xs sm:text-sm hidden sm:block">
-                  Current department statistics and management
+            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden bg-gradient-to-br from-card to-card/95 flex flex-col h-[380px]">
+              <CardHeader className="pb-4 shrink-0">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-4 rounded-full bg-pink-500/10">
+                      <Cake className="h-6 w-6 text-pink-600" />
+                    </div>
+                    <span>Upcoming Birthdays</span>
+                  </CardTitle>
+                  {upcomingBirthdays.length > 0 && (
+                    <Badge
+                      variant="secondary"
+                      className="font-medium bg-pink-500/5 text-pink-600 border-pink-500/10"
+                    >
+                      {upcomingBirthdays.length} events
+                    </Badge>
+                  )}
+                </div>
+                <CardDescription>
+                  Birthdays within the next 10 days
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0 px-3 sm:px-6 overflow-y-auto scrollbar-hide flex-1">
-                <div className="space-y-2 sm:space-y-3">
-                  {departments.map((dept, index) => (
-                    <div
-                      key={dept.id}
-                      className="flex items-center justify-between p-2 sm:p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors animate-fade-in"
-                      style={{ animationDelay: `${index * 100}ms` }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs sm:text-sm font-medium flex items-center gap-1 sm:gap-2">
-                          <span className="inline-block w-1 h-1 sm:w-1.5 sm:h-1.5 md:w-2 md:h-2 rounded-full bg-primary shrink-0"></span>
-                          <span className="truncate">
-                            {dept.name.length > 20
-                              ? dept.name.substring(0, 20) + "..."
-                              : dept.name}
-                          </span>
+              <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
+                {upcomingBirthdays.length > 0 ? (
+                  <div className="space-y-3">
+                    {upcomingBirthdays.map((emp, index) => {
+                      const colorClasses = getPastelColor(index);
+                      const isToday = emp.daysUntil === 0;
+
+                      return (
+                        <div
+                          key={emp.id}
+                          className={`group relative flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${colorClasses} animate-fade-in`}
+                          style={{ animationDelay: `${index * 100}ms` }}
+                        >
+                          <div className="flex flex-col items-center justify-center min-w-[50px] h-[54px] rounded-lg bg-white/80 backdrop-blur-sm shadow-sm border-white/50 group-hover:bg-white transition-colors">
+                            <span className="text-[10px] font-black uppercase tracking-wider opacity-60">
+                              {format(emp.birthdayDate!, "MMM")}
+                            </span>
+                            <span className="text-xl font-bold tracking-tight">
+                              {format(emp.birthdayDate!, "dd")}
+                            </span>
+                          </div>
+
+                          <div className="flex-1 min-w-0 space-y-0.5">
+                            <div className="flex items-center gap-2">
+                              <h4 className="text-sm font-bold truncate">
+                                {emp.name}
+                              </h4>
+                              {isToday && (
+                                <Badge className="bg-pink-500 hover:bg-pink-600 text-[10px] h-4 px-1.5 animate-pulse">
+                                  TODAY
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center text-[11px] font-medium opacity-70">
+                              <CalendarIcon className="mr-1 h-3 w-3" />
+                              {emp.department}
+                            </div>
+                          </div>
+
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            <span className="text-[10px] font-bold bg-white/40 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/20">
+                              {emp.daysUntil === 0
+                                ? "Today! 🎂"
+                                : emp.daysUntil === 1
+                                ? "Tomorrow"
+                                : `In ${emp.daysUntil} days`}
+                            </span>
+                          </div>
+
+                          {isToday && (
+                            <div className="absolute -top-1 -right-1">
+                              <Sparkles className="h-4 w-4 text-pink-500 animate-bounce" />
+                            </div>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {dept.employeeCount} emp
-                          <span className="hidden sm:inline">loyees</span>
-                          <span className="hidden md:inline">
-                            {" "}
-                            •{" "}
-                            {dept.manager.length > 15
-                              ? dept.manager.substring(0, 15) + "..."
-                              : dept.manager}
-                          </span>
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-medium text-primary border border-primary/20">
-                          {dept.status}
-                        </span>
-                      </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 text-center space-y-3 bg-pink-500/5 rounded-xl border border-dashed border-pink-500/20 h-full">
+                    <div className="p-3 rounded-full bg-pink-500/10">
+                      <Cake className="h-6 w-6 text-pink-500/40" />
                     </div>
-                  ))}
-                </div>
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold text-pink-500/80">
+                        {employees.length === 0
+                          ? "No colleagues found"
+                          : "No upcoming birthdays"}
+                      </p>
+                      <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
+                        {employees.length === 0
+                          ? "We couldn't find any team members in your organization."
+                          : "There are no birthdays scheduled for the next 10 days."}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
