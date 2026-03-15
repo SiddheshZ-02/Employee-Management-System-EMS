@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,8 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, MapPin, Globe, Target, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 
 interface OfficeLocation {
   id?: string;
@@ -48,6 +57,9 @@ export const OfficeLocationPage = () => {
   const [loading, setLoading] = useState(true);
   const [locations, setLocations] = useState<OfficeLocation[]>([]);
   const [isEditingIndex, setIsEditingIndex] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 5;
+
   const [form, setForm] = useState<FormState>({
     name: "",
     latitude: "",
@@ -56,6 +68,13 @@ export const OfficeLocationPage = () => {
     address: "",
     isActive: false,
   });
+
+  const totalPages = Math.max(1, Math.ceil(locations.length / pageSize));
+  const current = Math.min(currentPage, totalPages);
+  const start = (current - 1) * pageSize;
+  const paginatedLocations = useMemo(() => {
+    return locations.slice(start, start + pageSize);
+  }, [locations, start, pageSize]);
 
   const fetchLocation = useCallback(async () => {
     if (!token) {
@@ -249,11 +268,11 @@ export const OfficeLocationPage = () => {
   const startEdit = (index: number) => {
     const loc = locations[index];
     setForm({
-      name: "",
-      latitude: "",
-      longitude: "",
-      radius: "",
-      address: "",
+      name: String(loc.name || ""),
+      latitude: String(loc.latitude ?? ""),
+      longitude: String(loc.longitude ?? ""),
+      radius: String(loc.radius ?? ""),
+      address: String(loc.address || ""),
       isActive: Boolean(loc.isActive),
     });
     setIsEditingIndex(index);
@@ -281,164 +300,254 @@ export const OfficeLocationPage = () => {
               <CardDescription>Define the office geofence and address</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="grid gap-2">
-                  <label className="text-sm">Name</label>
-                  <Input value={form.name}
-                    placeholder={
-                      isEditingIndex !== null ? String(locations[isEditingIndex]?.name ?? "") : "Company Name"
-                    }
-                  onChange={(e) => setForm({ ...form, name: e.target.value }) } />
-                
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-primary" />
+                    Name
+                  </label>
+                  <Input 
+                    className="text-black"
+                    value={form.name}
+                    placeholder="Company Name"
+                    onChange={(e) => setForm({ ...form, name: e.target.value }) } 
+                  />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm">Radius (meters)</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Target className="h-4 w-4 text-primary" />
+                    Radius (meters)
+                  </label>
                   <Input
+                    className="text-black"
                     type="number"
                     value={form.radius}
                     onChange={(e) => setForm({ ...form, radius: e.target.value })}
-                      placeholder={
-                      isEditingIndex !== null ? String(locations[isEditingIndex]?.radius ?? "") : "Ex..100"
-                    }
+                    placeholder="Ex..100"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm">Latitude</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    Latitude
+                  </label>
                   <Input
+                    className="text-black"
                     type="number"
                     value={form.latitude}
                     onChange={(e) => setForm({ ...form, latitude: e.target.value })}
-                    placeholder={
-                      isEditingIndex !== null ? String(locations[isEditingIndex]?.latitude ?? "") : "Ex...19.182680"
-                    }
+                    placeholder="Ex...19.182680"
                   />
                 </div>
                 <div className="grid gap-2">
-                  <label className="text-sm">Longitude</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    Longitude
+                  </label>
                   <Input
+                    className="text-black"
                     type="number"
                     value={form.longitude}
                     onChange={(e) => setForm({ ...form, longitude: e.target.value })}
-                    placeholder={
-                      isEditingIndex !== null ? String(locations[isEditingIndex]?.longitude ?? "") : "Ex...73.050678"
-                    }
+                    placeholder="Ex...73.050678"
                   />
                 </div>
                 <div className="grid gap-2 sm:col-span-2">
-                  <label className="text-sm">Address</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-primary" />
+                    Address
+                  </label>
                   <Textarea
+                    className="text-black"
                     value={form.address}
                     onChange={(e) => setForm({ ...form, address: e.target.value })}
                     rows={3}
-                    placeholder={
-                      isEditingIndex !== null ? String(locations[isEditingIndex]?.address ?? "") : "Office address"
-                    }
+                    placeholder="Office address"
                   />
                 </div>
               <div className="sm:col-span-1">
-                <label className="flex items-center gap-2 text-sm">
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="checkbox"
+                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                     checked={Boolean(form.isActive)}
                     onChange={(e) => setForm({ ...form, isActive: e.target.checked })}
                   />
-                  Active
+                  Active Status
                 </label>
               </div>
               </div>
-              <div className="mt-4 flex gap-2">
+              <div className="mt-6 flex gap-3">
                 {isEditingIndex === null ? (
-                  <Button onClick={addLocation}>Add Location</Button>
+                  <Button onClick={addLocation} className="gap-2">
+                    <MapPin className="h-4 w-4" />
+                    Add Location
+                  </Button>
                 ) : (
                   <>
-                    <Button onClick={updateLocation}>Update Location</Button>
+                    <Button onClick={updateLocation} className="gap-2">
+                      <Edit className="h-4 w-4" />
+                      Update Location
+                    </Button>
                     <Button variant="outline" onClick={resetForm}>Cancel</Button>
                   </>
                 )}
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Locations</CardTitle>
-              <CardDescription>Existing office locations</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="rounded-md border overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-center p-2">Name</th>
-                      <th className="text-center p-2 w-[240px]">Address</th>
-                      <th className="text-center p-2">Latitude</th>
-                      <th className="text-center p-2">Longitude</th>
-                      <th className="text-center p-2">Radius</th>
-                      <th className="text-center p-2">Active</th>
-                      <th className="text-center p-2">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {locations.length === 0 ? (
-                      <tr>
-                        <td className="p-3 text-muted-foreground" colSpan={7}>No locations yet</td>
-                      </tr>
-                    ) : (
-                      locations.map((loc, idx) => (
-                        <tr key={(loc.name || "") + idx} className="border-b">
-                          <td className="p-2 text-center">{loc.name}</td>
-                          <td className="p-2 text-center">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div
-                                  className="text-sm"
-                                  style={{
-                                    display: "-webkit-box",
-                                    WebkitLineClamp: 1,
-                                    WebkitBoxOrient: "vertical",
-                                    overflow: "hidden",
-                                    maxWidth: "240px",
-                                  }}
-                                >
-                                  {loc.address || "-"}
-                                </div>
-                              </TooltipTrigger>
-                              {loc.address ? (
-                                <TooltipContent sideOffset={6}>{loc.address}</TooltipContent>
-                              ) : null}
-                            </Tooltip>
-                          </td>
-                          <td className="p-2 text-center">{loc.latitude}</td>
-                          <td className="p-2 text-center">{loc.longitude}</td>
-                          <td className="p-2 text-center">{loc.radius}</td>
-                          <td className="p-2 text-center">{loc.isActive ? "Yes" : "No"}</td>
-                          <td className="p-2 text-center">
-                            <div className="flex justify-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => startEdit(idx)}
-                                className="h-8 w-8 p-0"
-                                title="Edit"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deleteLocation(idx)}
-                                className="text-destructive hover:text-destructive h-8 w-8 p-0"
-                                title="Delete"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+          <Card className="border shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold">Existing Locations</CardTitle>
+                <CardDescription>Manage your office geofence locations</CardDescription>
               </div>
+              <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                {locations.length} Locations
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="font-semibold text-foreground text-center">Name</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center w-[240px]">Address</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Latitude</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Longitude</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Radius</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {locations.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="h-40 text-center">
+                          <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                            <MapPin className="h-10 w-10 opacity-20" />
+                            <span className="font-medium">No locations found.</span>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      paginatedLocations.map((loc, idx) => {
+                        const actualIdx = start + idx;
+                        return (
+                          <TableRow key={loc.id || idx} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                            <TableCell className="font-medium text-foreground text-center">{loc.name}</TableCell>
+                            <TableCell className="text-center">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <div
+                                    className="text-sm text-muted-foreground mx-auto"
+                                    style={{
+                                      display: "-webkit-box",
+                                      WebkitLineClamp: 1,
+                                      WebkitBoxOrient: "vertical",
+                                      overflow: "hidden",
+                                      maxWidth: "240px",
+                                    }}
+                                  >
+                                    {loc.address || "-"}
+                                  </div>
+                                </TooltipTrigger>
+                                {loc.address ? (
+                                  <TooltipContent sideOffset={6}>{loc.address}</TooltipContent>
+                                ) : null}
+                              </Tooltip>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-center">{loc.latitude}</TableCell>
+                            <TableCell className="text-muted-foreground text-center">{loc.longitude}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="secondary" className="font-semibold">
+                                {loc.radius}m
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {loc.isActive ? (
+                                <Badge className="bg-green-500/10 text-green-500 hover:bg-green-500/20 border-green-500/20">
+                                  Active
+                                </Badge>
+                              ) : (
+                                <Badge variant="destructive" className="bg-red-500/10 text-red-500 hover:bg-red-500/20 border-red-500/20">
+                                  Inactive
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex justify-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => startEdit(actualIdx)}
+                                  className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary"
+                                  title="Edit"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteLocation(actualIdx)}
+                                  className="text-destructive hover:bg-destructive/10 h-8 w-8 p-0"
+                                  title="Delete"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Pagination Controls */}
+              {locations.length > 0 && (
+                <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card">
+                  <div className="text-sm text-muted-foreground">
+                    Showing <span className="font-semibold text-foreground">{start + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">{Math.min(start + pageSize, locations.length)}</span> of{" "}
+                    <span className="font-semibold text-foreground">{locations.length}</span> locations
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                      <Button
+                        key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(page)}
+                        className="h-8 w-8 p-0"
+                      >
+                        {page}
+                      </Button>
+                    ))}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 w-8 p-0"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

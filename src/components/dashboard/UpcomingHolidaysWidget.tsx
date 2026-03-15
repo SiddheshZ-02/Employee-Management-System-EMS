@@ -9,7 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { Calendar as CalendarIcon, ChevronRight, PartyPopper, Sparkles } from "lucide-react";
-import { format, parseISO, isAfter, startOfDay, isSameDay, differenceInDays } from "date-fns";
+import { format, parseISO, isAfter, startOfDay, isSameDay, differenceInDays, isSameMonth } from "date-fns";
 
 const LIGHT_COLORS = [
   "bg-blue-50 border-blue-100 text-blue-700",
@@ -38,11 +38,13 @@ export const UpcomingHolidaysWidget = () => {
     return () => clearInterval(timer);
   }, [today]);
 
-  const upcomingHolidays = useMemo(() => {
+  const currentMonthHolidays = useMemo(() => {
     return holidays
-      .filter((h) => isAfter(parseISO(h.date), today) || isSameDay(parseISO(h.date), today))
+      .filter((h) => {
+        const holidayDate = parseISO(h.date);
+        return isSameMonth(holidayDate, today);
+      })
       .sort((a, b) => a.date.localeCompare(b.date));
-      // Removed slice to show all in scrollable area
   }, [holidays, today]);
 
   return (
@@ -53,31 +55,32 @@ export const UpcomingHolidaysWidget = () => {
             <div className="p-2 rounded-full bg-primary/10">
               <PartyPopper className="h-5 w-5 text-primary" />
             </div>
-            <span>Upcoming Holidays</span>
+            <span>Holidays this Month</span>
           </CardTitle>
-          {upcomingHolidays.length > 0 && (
+          {currentMonthHolidays.length > 0 && (
             <Badge variant="secondary" className="font-medium bg-primary/5 text-primary border-primary/10">
-              {upcomingHolidays.length} events
+              {currentMonthHolidays.length} events
             </Badge>
           )}
         </div>
         <CardDescription>
-          Plan your time off around these upcoming breaks
+          Showing holidays for {format(today, "MMMM yyyy")}
         </CardDescription>
       </CardHeader>
       <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
-        {upcomingHolidays.length > 0 ? (
+        {currentMonthHolidays.length > 0 ? (
           <div className="space-y-3">
-            {upcomingHolidays.map((holiday, index) => {
+            {currentMonthHolidays.map((holiday, index) => {
               const date = parseISO(holiday.date);
               const isToday = isSameDay(date, today);
+              const isPast = !isToday && !isAfter(date, today);
               const daysLeft = differenceInDays(date, today);
               const colorClasses = getPastelColor(index);
 
               return (
                 <div
                   key={holiday._id}
-                  className={`group relative flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${colorClasses}`}
+                  className={`group relative flex items-center gap-4 p-3 rounded-xl border transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${colorClasses} ${isPast ? 'opacity-60 grayscale-[0.5]' : ''}`}
                 >
                   <div className="flex flex-col items-center justify-center min-w-[50px] h-[54px] rounded-lg bg-white/80 backdrop-blur-sm shadow-sm border-white/50 group-hover:bg-white transition-colors">
                     <span className="text-[10px] font-black uppercase tracking-wider opacity-60">
@@ -106,14 +109,19 @@ export const UpcomingHolidaysWidget = () => {
                   </div>
 
                   <div className="flex flex-col items-end gap-1 shrink-0">
-                    {!isToday && (
+                    {isToday ? (
+                      <span className="text-[10px] font-bold bg-white/40 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/20">
+                        Today
+                      </span>
+                    ) : isAfter(date, today) ? (
                       <span className="text-[10px] font-bold bg-white/40 px-2 py-0.5 rounded-full backdrop-blur-sm border border-white/20">
                         {daysLeft === 1 ? "Tomorrow" : `In ${daysLeft} days`}
                       </span>
+                    ) : (
+                      <span className="text-[10px] font-bold bg-black/5 px-2 py-0.5 rounded-full backdrop-blur-sm border border-black/5">
+                        Passed
+                      </span>
                     )}
-                    {/* <div className="flex items-center opacity-40 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="h-4 w-4 transform group-hover:translate-x-0.5 transition-transform" />
-                    </div> */}
                   </div>
 
                   {isToday && (
@@ -132,10 +140,10 @@ export const UpcomingHolidaysWidget = () => {
             </div>
             <div className="space-y-1">
               <p className="text-sm font-semibold text-primary/80">
-                No holidays for this month
+                No holidays this month
               </p>
               <p className="text-xs text-muted-foreground max-w-[200px] mx-auto">
-                Enjoy your work days! Stay tuned for next month's breaks.
+                Enjoy your work days! No holidays scheduled for {format(today, "MMMM")}.
               </p>
             </div>
           </div>

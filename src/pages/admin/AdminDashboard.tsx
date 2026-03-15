@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { setEmployees } from "@/store/slices/employeeSlice";
 import { setDepartments } from "@/store/slices/departmentSlice";
+import { setHolidays } from "@/store/slices/holidaySlice";
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 
@@ -52,7 +53,6 @@ interface BackendDepartment {
   status?: string;
 }
 
-
 export const AdminDashboard = () => {
   const dispatch = useAppDispatch();
   const { employees } = useAppSelector((state) => state.employees);
@@ -65,11 +65,14 @@ export const AdminDashboard = () => {
     }
     const fetchData = async () => {
       try {
-        const [employeesRes, departmentsRes] = await Promise.all([
+        const [employeesRes, departmentsRes, holidaysRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/admin/employees?page=1&limit=100`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
           fetch(`${API_BASE_URL}/api/admin/departments?page=1&limit=100`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/api/holidays`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);
@@ -117,6 +120,13 @@ export const AdminDashboard = () => {
             dispatch(setDepartments(mappedDepartments));
           }
         }
+
+        if (holidaysRes.ok) {
+          const holidaysJson = await holidaysRes.json();
+          if (holidaysJson.success && Array.isArray(holidaysJson.holidays)) {
+            dispatch(setHolidays(holidaysJson.holidays));
+          }
+        }
       } catch {
         return;
       }
@@ -142,23 +152,6 @@ export const AdminDashboard = () => {
               <p className="text-muted-foreground mt-2">
                 Here's an overview of your organization's current status.
               </p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground shrink-0">
-              <Calendar className="h-4 w-4" />
-              <span className="hidden lg:inline">
-                {new Date().toLocaleDateString("en-US", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </span>
-              <span className="lg:hidden">
-                {new Date().toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
             </div>
           </div>
 
@@ -298,7 +291,6 @@ export const AdminDashboard = () => {
               </div>
             </div>
           </div>
-          
         </div>
       </div>
     </div>

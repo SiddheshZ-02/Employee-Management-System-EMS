@@ -39,7 +39,7 @@ import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import { deleteDepartment, setDepartments, type Department } from "@/store/slices/departmentSlice";
 import { setEmployees } from "@/store/slices/employeeSlice";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   Pagination,
@@ -539,26 +539,36 @@ export const DepartmentManagement = () => {
 
               <div className="rounded-md border overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="min-w-[150px]">
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[80px] font-semibold text-foreground text-center">
+                        Sr No
+                      </TableHead>
+                      <TableHead className="min-w-[150px] font-semibold text-foreground text-center">
                         Department
                       </TableHead>
-                      <TableHead className="min-w-[120px] hidden sm:table-cell">
+                      <TableHead className="min-w-[120px] font-semibold text-foreground text-center hidden sm:table-cell">
                         Manager
                       </TableHead>
-                      <TableHead className="min-w-[100px]">Employees</TableHead>
-                      <TableHead className="min-w-[80px]">Status</TableHead>
-                      <TableHead className="text-right min-w-[100px]">
+                      <TableHead className="min-w-[100px] font-semibold text-foreground text-center">
+                        Employees
+                      </TableHead>
+                      <TableHead className="min-w-[80px] font-semibold text-foreground text-center">
+                        Status
+                      </TableHead>
+                      <TableHead className="min-w-[100px] font-semibold text-foreground text-center">
                         Actions
                       </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedDepartments.map((department) => (
-                      <TableRow key={department.id}>
-                        <TableCell>
-                          <div className="min-w-0">
+                    {paginatedDepartments.map((department, index) => (
+                      <TableRow key={department.id} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                        <TableCell className="text-center font-medium">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <div className="min-w-0 flex flex-col items-center">
                             <div className="font-medium truncate">
                               {department.name}
                             </div>
@@ -570,11 +580,11 @@ export const DepartmentManagement = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden sm:table-cell">
+                        <TableCell className="hidden sm:table-cell text-center">
                           <div className="truncate">{department.manager}</div>
                         </TableCell>
-                        <TableCell>
-                          <div className="font-medium">
+                        <TableCell className="text-center">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
                             {
                               employees.filter(
                                 (emp) =>
@@ -582,22 +592,26 @@ export const DepartmentManagement = () => {
                                   department.name.trim().toLowerCase()
                               ).length
                             }
-                          </div>
+                          </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <Badge
                             variant={
                               department.status === "Active"
                                 ? "default"
                                 : "secondary"
                             }
-                            className="shrink-0"
+                            className={
+                              department.status === "Active"
+                                ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
+                                : "bg-secondary/10 text-secondary-foreground border-secondary/20 hover:bg-secondary/20"
+                            }
                           >
                             {department.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -622,98 +636,60 @@ export const DepartmentManagement = () => {
                 </Table>
               </div>
 
-              {/* Advanced Pagination Controls with Ellipsis */}
-              <div className="mt-4 flex justify-center">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage((prev) => Math.max(prev - 1, 1));
-                        }}
-                        isActive={false}
-                      />
-                    </PaginationItem>
-                    {/* Show first page */}
-                    {totalPages > 5 && currentPage > 3 && (
-                      <>
-                        <PaginationItem>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === 1}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(1);
-                            }}
+              {/* Attendance Tracking Style Pagination Controls */}
+              {filteredDepartments.length > 0 && (
+                <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing <span className="font-semibold text-foreground">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">{Math.min(currentPage * itemsPerPage, filteredDepartments.length)}</span> of{" "}
+                    <span className="font-semibold text-foreground">{filteredDepartments.length}</span> departments
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) pageNum = i + 1;
+                        else if (currentPage <= 3) pageNum = i + 1;
+                        else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                        else pageNum = currentPage - 2 + i;
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            className={`h-8 w-8 p-0 ${currentPage === pageNum ? "shadow-sm" : ""}`}
+                            onClick={() => setCurrentPage(pageNum)}
                           >
-                            1
-                          </PaginationLink>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      </>
-                    )}
-                    {/* Show page numbers around current page */}
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter((page) => {
-                        if (totalPages <= 5) return true;
-                        if (currentPage <= 3) return page <= 5;
-                        if (currentPage >= totalPages - 2)
-                          return page >= totalPages - 4;
-                        return Math.abs(page - currentPage) <= 2;
-                      })
-                      .map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === page}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(page);
-                            }}
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-                    {/* Show last page */}
-                    {totalPages > 5 && currentPage < totalPages - 2 && (
-                      <>
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === totalPages}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(totalPages);
-                            }}
-                          >
-                            {totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      </>
-                    )}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage((prev) =>
-                            Math.min(prev + 1, totalPages)
-                          );
-                        }}
-                        isActive={false}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -98,6 +98,9 @@ const leaveSlice = createSlice({
         state.leaveTypes[index] = action.payload;
       }
     },
+    removeLeaveType: (state, action: PayloadAction<string>) => {
+      state.leaveTypes = state.leaveTypes.filter(lt => (lt._id || lt.id) !== action.payload);
+    },
     submitLeaveRequest: (state, action: PayloadAction<Omit<LeaveRequest, 'id'>>) => {
       const newRequest: LeaveRequest = {
         ...action.payload,
@@ -127,5 +130,6 @@ export const {
   setEmployeeLeaveBalances,
   addLeaveType,
   updateLeaveType,
+  removeLeaveType,
 } = leaveSlice.actions;
 export default leaveSlice.reducer;

@@ -20,23 +20,23 @@ export const AdminAccess = () => {
     {
       title: "Company Holidays",
       description: "Configure and manage organizational holiday calendars.",
-      icon: <CalendarDays className="h-8 w-8 text-primary" />,
+      icon: <CalendarDays className="h-6 w-6 text-primary" />,
       path: "/admin/holidays",
-      color: "bg-blue-500/10",
+      color: "bg-blue-500/50",
     },
     {
       title: "Company Week Off",
       description: "Define standard non-working days for the organization.",
-      icon: <Settings2 className="h-8 w-8 text-primary" />,
+      icon: <Settings2 className="h-6 w-6 text-primary" />,
       path: "/admin/weekoff",
-      color: "bg-purple-500/10",
+      color: "bg-purple-500/50",
     },
     {
       title: "Leave Allocation",
       description: "Manage leave types and grant yearly leave balances.",
-      icon: <CalendarCheck className="h-8 w-8 text-primary" />,
+      icon: <CalendarCheck className="h-6 w-6 text-primary" />,
       path: "/admin/leave-allocation",
-      color: "bg-green-500/10",
+      color: "bg-green-500/50",
     },
   ];
 
@@ -55,22 +55,24 @@ export const AdminAccess = () => {
         {accessModules.map((module) => (
           <Card
             key={module.path}
-            className="group cursor-pointer hover:shadow-xl transition-all duration-300 border-2 hover:border-primary/50 overflow-hidden"
+            className="group cursor-pointer hover:shadow-2xl transition-all duration-500 border-2 hover:border-primary/30 overflow-hidden bg-card"
             onClick={() => navigate(module.path)}
           >
-            <CardHeader className={`${module.color} pb-8`}>
-              <div className="flex justify-between items-start">
-                <div className="p-3 bg-background rounded-xl shadow-sm group-hover:scale-110 transition-transform duration-300">
+            <CardHeader className={`${module.color} p-4 `}>
+              <div className="flex justify-between items-center">
+                <div className="p-2 bg-background rounded-2xl shadow-sm border border-border/50 group-hover:scale-110 transition-all duration-500 group-hover:shadow-md group-hover:border-primary/20">
                   {module.icon}
                 </div>
-                <ChevronRight className="h-6 w-6 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
+                <div className="p-1 bg-background/50 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 -translate-x-2 group-hover:translate-x-0 shadow-sm border border-border/50">
+                  <ChevronRight className="h-6 w-6 text-primary" />
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="pt-6">
-              <CardTitle className="text-xl mb-2 group-hover:text-primary transition-colors">
+            <CardContent >
+              <CardTitle className="text-xl font-bold mb-2 group-hover:text-primary transition-colors duration-300">
                 {module.title}
               </CardTitle>
-              <CardDescription className="text-base leading-relaxed">
+              <CardDescription className="text-muted-foreground text-[15px] leading-relaxed">
                 {module.description}
               </CardDescription>
             </CardContent>

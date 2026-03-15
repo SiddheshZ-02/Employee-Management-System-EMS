@@ -2,13 +2,22 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Info, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+type DayStatus = "Present" | "Absent" | "Leave" | "Week Off" | "Holiday" | "Half Day" | "Checked In";
 
 interface EmployeeDetailsResponse {
   success?: boolean;
@@ -39,6 +48,7 @@ interface AttendanceRecord {
   checkInTime?: string;
   checkOutTime?: string;
   workingHours?: number;
+  status?: string;
 }
 
 interface AdminLeaveRequestBackend {
@@ -76,8 +86,76 @@ export const EmployeeAttendanceDetails = () => {
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
 
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
+  // Calculate default 30 days range
+  const today = new Date();
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(today.getDate() - 30);
+  const todayStr = today.toISOString().split("T")[0];
+  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+
+  const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Use employee's creation date as the minimum possible date for attendance
+  const accountCreatedAt = employee?.createdAt ? new Date(employee.createdAt) : new Date("2024-01-01");
+  const accountCreatedAtStr = accountCreatedAt.toISOString().split("T")[0];
+
+  useEffect(() => {
+    if (employee?.createdAt) {
+      const createdAt = new Date(employee.createdAt);
+      const createdAtStr = createdAt.toISOString().split("T")[0];
+      
+      // If 30 days ago is before creation date, set start date to creation date
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(today.getDate() - 30);
+      
+      if (thirtyDaysAgo < createdAt) {
+        setStartDate(createdAtStr);
+      }
+    }
+  }, [employee]);
+
+  const getStatusBadge = (status: DayStatus, isWorkOnLeave?: boolean) => {
+    switch (status) {
+      case "Present":
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20">Present</Badge>
+            {isWorkOnLeave && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-[10px] py-0 px-1 border-amber-500/50 text-amber-600 bg-amber-50/50 cursor-help">
+                      Work on Leave
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Worked on an approved leave day.</p>
+                    <p className="text-[10px] text-muted-foreground">Balance should be adjusted by HR.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        );
+      case "Checked In":
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">Checked In</Badge>;
+      case "Absent":
+        return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20">Absent</Badge>;
+      case "Half Day":
+        return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500/20">Half Day</Badge>;
+      case "Leave":
+        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Leave</Badge>;
+      case "Week Off":
+        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20">Week Off</Badge>;
+      case "Holiday":
+        return <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20">Holiday</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   const fetchEmployee = useCallback(async () => {
     if (!token || !id) {
@@ -125,9 +203,8 @@ export const EmployeeAttendanceDetails = () => {
     if (!token || !id) {
       return;
     }
+    setAttendanceLoading(true);
     try {
-      setAttendanceLoading(true);
-
       const attendanceParams = new URLSearchParams();
       attendanceParams.append("userId", String(id));
       if (startDate) {
@@ -161,7 +238,12 @@ export const EmployeeAttendanceDetails = () => {
       } else {
         setAttendanceRecords([]);
       }
+    } catch (err) {
+      console.error("Attendance fetch error:", err);
+      setAttendanceRecords([]);
+    }
 
+    try {
       const leaveParams = new URLSearchParams();
       leaveParams.append("status", "approved");
       leaveParams.append("userId", String(id));
@@ -175,7 +257,7 @@ export const EmployeeAttendanceDetails = () => {
       leaveParams.append("limit", "365");
 
       const leaveRes = await fetch(
-        `${API_BASE_URL}api/admin/leave-requests?${leaveParams.toString()}`,
+        `${API_BASE_URL}/api/admin/leave-requests?${leaveParams.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -201,8 +283,8 @@ export const EmployeeAttendanceDetails = () => {
       } else {
         setLeaveRecords([]);
       }
-    } catch {
-      setAttendanceRecords([]);
+    } catch (err) {
+      console.error("Leave fetch error:", err);
       setLeaveRecords([]);
     } finally {
       setAttendanceLoading(false);
@@ -223,16 +305,16 @@ export const EmployeeAttendanceDetails = () => {
         presentDays: 0,
         leaveDays: 0,
         absentDays: 0,
+        weekOffDays: 0,
         totalWorkingHoursLabel: "0h 0m",
       };
     }
 
-    const presentDates = new Set<string>();
+    const attendanceByDate = new Map<string, AttendanceRecord>();
     attendanceRecords.forEach((record) => {
       if (record.date) {
-        const d = new Date(record.date);
-        const key = d.toISOString().split("T")[0];
-        presentDates.add(key);
+        // record.date is YYYY-MM-DD from backend
+        attendanceByDate.set(record.date, record);
       }
     });
 
@@ -245,11 +327,8 @@ export const EmployeeAttendanceDetails = () => {
       const end = new Date(leave.endDate);
       const current = new Date(start);
       while (current <= end) {
-        const day = current.getDay();
-        if (day !== 0 && day !== 6) {
-          const key = current.toISOString().split("T")[0];
-          leaveDates.add(key);
-        }
+        const key = format(current, "yyyy-MM-dd");
+        leaveDates.add(key);
         current.setDate(current.getDate() + 1);
       }
     });
@@ -260,27 +339,41 @@ export const EmployeeAttendanceDetails = () => {
     let present = 0;
     let leave = 0;
     let absent = 0;
+    let weekOff = 0;
 
     const cursor = new Date(start);
     while (cursor <= end) {
       const day = cursor.getDay();
-      if (day !== 0 && day !== 6) {
-        const key = cursor.toISOString().split("T")[0];
-        if (presentDates.has(key)) {
-          present += 1;
-        } else if (leaveDates.has(key)) {
-          leave += 1;
-        } else {
-          absent += 1;
-        }
+      const key = format(cursor, "yyyy-MM-dd");
+      
+      if (attendanceByDate.has(key)) {
+        present += 1;
+      } else if (day === 0 || day === 6) {
+        weekOff += 1;
+      } else if (leaveDates.has(key)) {
+        leave += 1;
+      } else {
+        absent += 1;
       }
       cursor.setDate(cursor.getDate() + 1);
     }
 
     let totalWorkingHours = 0;
     attendanceRecords.forEach((record) => {
-      if (typeof record.workingHours === "number") {
-        totalWorkingHours += record.workingHours;
+      let workingHours = record.workingHours || 0;
+
+      // Calculate live hours if currently checked in
+      if (record.status === "checked-in" || (record.checkInTime && (!record.checkOutTime || record.checkOutTime === "-"))) {
+        const checkInDate = new Date(record.checkInTime || "");
+        if (!Number.isNaN(checkInDate.getTime())) {
+          const now = new Date();
+          const diff = (now.getTime() - checkInDate.getTime()) / (1000 * 60 * 60);
+          workingHours = Math.max(0, diff);
+        }
+      }
+
+      if (typeof workingHours === "number") {
+        totalWorkingHours += workingHours;
       }
     });
     const wholeHours = Math.floor(totalWorkingHours);
@@ -291,6 +384,7 @@ export const EmployeeAttendanceDetails = () => {
       presentDays: present,
       leaveDays: leave,
       absentDays: absent,
+      weekOffDays: weekOff,
       totalWorkingHoursLabel,
     };
   }, [attendanceRecords, leaveRecords, startDate, endDate]);
@@ -326,12 +420,30 @@ export const EmployeeAttendanceDetails = () => {
               });
         }
 
-        let totalHours = "-";
-        if (typeof record.workingHours === "number") {
-          totalHours = `${record.workingHours}h`;
+        let totalHours = "0h 0m";
+        let workingHours = record.workingHours || 0;
+
+        // Calculate live hours if currently checked in
+        if (record.status === "checked-in" || (record.checkInTime && !record.checkOutTime)) {
+          const checkInDate = new Date(record.checkInTime || "");
+          if (!Number.isNaN(checkInDate.getTime())) {
+            const now = new Date();
+            const diff = (now.getTime() - checkInDate.getTime()) / (1000 * 60 * 60);
+            workingHours = Math.max(0, diff);
+          }
+        }
+
+        if (typeof workingHours === "number") {
+          const h = Math.floor(workingHours);
+          const m = Math.round((workingHours - h) * 60);
+          totalHours = `${h}h ${m}m`;
         }
 
         const workMode = record.workMode || "-";
+        
+        // Accurate status detection: if check-out is missing or status is explicitly checked-in
+        const isActive = record.status === "checked-in" || !record.checkOutTime || record.checkOutTime === "";
+        const status: DayStatus = isActive ? "Checked In" : "Present";
 
         return {
           id: record._id,
@@ -340,7 +452,7 @@ export const EmployeeAttendanceDetails = () => {
           checkOut,
           totalHours,
           workMode,
-          isLeave: false,
+          status,
         };
       });
     }
@@ -350,10 +462,21 @@ export const EmployeeAttendanceDetails = () => {
       if (!record.date) {
         return;
       }
-      const d = new Date(record.date);
-      const key = d.toISOString().split("T")[0];
-      if (!attendanceByDate.has(key)) {
-        attendanceByDate.set(key, record);
+      attendanceByDate.set(record.date, record);
+    });
+
+    const leaveDates = new Set<string>();
+    leaveRecords.forEach((leave) => {
+      if (!leave.startDate || !leave.endDate) {
+        return;
+      }
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      const current = new Date(start);
+      while (current <= end) {
+        const key = format(current, "yyyy-MM-dd");
+        leaveDates.add(key);
+        current.setDate(current.getDate() + 1);
       }
     });
 
@@ -364,7 +487,7 @@ export const EmployeeAttendanceDetails = () => {
       checkOut: string;
       totalHours: string;
       workMode: string;
-      isLeave: boolean;
+      status: DayStatus;
     }[] = [];
 
     const start = new Date(startDate);
@@ -372,11 +495,12 @@ export const EmployeeAttendanceDetails = () => {
     const cursor = new Date(start);
 
     while (cursor <= end) {
-      const key = cursor.toISOString().split("T")[0];
+      const key = format(cursor, "yyyy-MM-dd");
+      const day = cursor.getDay();
       const record = attendanceByDate.get(key);
 
       if (record) {
-        const dateLabel = format(new Date(record.date), "yyyy-MM-dd");
+        const dateLabel = key; // date is already YYYY-MM-DD
 
         let checkIn = "-";
         if (record.checkInTime) {
@@ -402,12 +526,27 @@ export const EmployeeAttendanceDetails = () => {
               });
         }
 
-        let totalHours = "-";
-        if (typeof record.workingHours === "number") {
-          totalHours = `${record.workingHours}h`;
+        let totalHours = "0h 0m";
+        let workingHours = record.workingHours || 0;
+
+        // Calculate live hours if currently checked in
+        const isActive = record.status === "checked-in" || !record.checkOutTime || record.checkOutTime === "";
+        if (isActive) {
+          const checkInDate = new Date(record.checkInTime || "");
+          if (!Number.isNaN(checkInDate.getTime())) {
+            const now = new Date();
+            const diff = (now.getTime() - checkInDate.getTime()) / (1000 * 60 * 60);
+            workingHours = Math.max(0, diff);
+          }
         }
 
-        const workMode = record.workMode || "-";
+        if (typeof workingHours === "number") {
+          const h = Math.floor(workingHours);
+          const m = Math.round((workingHours - h) * 60);
+          totalHours = `${h}h ${m}m`;
+        }
+
+        const status: DayStatus = isActive ? "Checked In" : "Present";
 
         rows.push({
           id: record._id,
@@ -415,27 +554,39 @@ export const EmployeeAttendanceDetails = () => {
           checkIn,
           checkOut,
           totalHours,
-          workMode,
-          isLeave: false,
+          workMode: record.workMode || "-",
+          status,
         });
       } else {
         const dateLabel = format(cursor, "yyyy-MM-dd");
+        let status: DayStatus = "Absent";
+        if (day === 0 || day === 6) status = "Week Off";
+        else if (leaveDates.has(key)) status = "Leave";
+
         rows.push({
           id: key,
           dateLabel,
           checkIn: "-",
           checkOut: "-",
-          totalHours: "Leave",
+          totalHours: "0h 0m",
           workMode: "-",
-          isLeave: true,
+          status,
         });
       }
 
       cursor.setDate(cursor.getDate() + 1);
     }
 
-    return rows;
-  }, [attendanceRecords, startDate, endDate]);
+    // Sort to show latest data on top
+    return rows.sort((a, b) => b.dateLabel.localeCompare(a.dateLabel));
+  }, [attendanceRecords, leaveRecords, startDate, endDate]);
+
+  const paginatedRows = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return formattedAttendanceRows.slice(start, start + itemsPerPage);
+  }, [formattedAttendanceRows, currentPage]);
+
+  const totalPages = Math.ceil(formattedAttendanceRows.length / itemsPerPage);
 
   if (loading) {
     return (
@@ -462,132 +613,329 @@ export const EmployeeAttendanceDetails = () => {
     <div className="w-full min-h-full bg-background">
       <div className="w-full h-full p-4 md:p-6 lg:p-8">
         <div className="space-y-6 w-full">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-bold">Employee Attendance</h2>
-              <p className="text-muted-foreground">
-                Detailed attendance and leave summary for this employee.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => navigate("/admin/attendance")}>
-                Back to Attendance List
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate(-1)}
+                className="h-10 w-10 border shadow-sm"
+              >
+                <ArrowLeft className="h-5 w-5" />
               </Button>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-2xl sm:text-3xl font-bold truncate">
+                  Employee Attendance
+                </h2>
+                <p className="text-sm sm:text-base text-muted-foreground">
+                  Detailed attendance and leave summary for this employee.
+                </p>
+              </div>
             </div>
           </div>
 
       
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Present Days</CardTitle>
-                <CardDescription>Selected period</CardDescription>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Card className="border shadow-sm bg-card overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Present</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{dayCounts.presentDays}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total present days</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Absent Days</CardTitle>
-                <CardDescription>Selected period</CardDescription>
+
+            <Card className="border shadow-sm bg-card overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-orange-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Absent</CardTitle>
+                <div className="h-4 w-4 rounded-full border-2 border-orange-500" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{dayCounts.absentDays}</div>
+                <p className="text-xs text-muted-foreground mt-1">Days not marked</p>
               </CardContent>
             </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm">Total Working Hours</CardTitle>
-                <CardDescription>Selected period</CardDescription>
+
+            <Card className="border shadow-sm bg-card overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Leaves</CardTitle>
+                <Palmtree className="h-4 w-4 text-red-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dayCounts.leaveDays}</div>
+                <p className="text-xs text-muted-foreground mt-1">Approved leaves</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border shadow-sm bg-card overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Hours</CardTitle>
+                <Clock className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">{dayCounts.totalWorkingHoursLabel}</div>
+                <p className="text-xs text-muted-foreground mt-1">Total work time</p>
               </CardContent>
             </Card>
           </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Attendance Details</CardTitle>
-              <CardDescription>
-                Daily attendance records for the selected date range.
-              </CardDescription>
+          <Card className="border shadow-sm bg-card">
+            <CardHeader className="pb-3 border-b">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Custom Date Filter
+              </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid gap-3 sm:grid-cols-3 mb-4">
-                <div className="grid gap-2">
-                  <div className="text-sm">Start Date</div>
-                  <Input
-                    type="date"
-                    value={startDate}
-                    onChange={(event) => setStartDate(event.target.value)}
-                  />
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row items-end gap-4">
+                <div className="grid gap-2 flex-1 w-full">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Start Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="date"
+                      className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                      value={startDate}
+                      min={accountCreatedAtStr}
+                      max={todayStr}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch (err) {
+                          console.debug("showPicker not supported", err);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="grid gap-2">
-                  <div className="text-sm">End Date</div>
-                  <Input
-                    type="date"
-                    value={endDate}
-                    onChange={(event) => setEndDate(event.target.value)}
-                  />
+                <div className="grid gap-2 flex-1 w-full">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">End Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <input
+                      type="date"
+                      className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
+                      value={endDate}
+                      min={accountCreatedAtStr}
+                      max={todayStr}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      onClick={(e) => {
+                        try {
+                          e.currentTarget.showPicker();
+                        } catch (err) {
+                          console.debug("showPicker not supported", err);
+                        }
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-end">
+                <div className="flex items-center gap-2 w-full md:w-auto">
                   <Button
+                    type="button"
+                    className="flex-1 md:flex-none px-6 h-[42px] shadow-sm"
                     onClick={() => {
+                      if (!startDate || !endDate) {
+                        toast({
+                          title: "Warning",
+                          description: "Please select both start and end dates.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      if (startDate < accountCreatedAtStr) {
+                        toast({
+                          title: "Warning",
+                          description: `Start date cannot be before account creation date (${accountCreatedAtStr}).`,
+                          variant: "destructive",
+                        });
+                        return;
+                      }
                       fetchAttendanceAndLeaves();
+                      setCurrentPage(1);
                     }}
                   >
-                    Apply
+                    Apply Filter
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-[42px] w-[42px] border-border hover:bg-muted"
+                    onClick={() => {
+                      const thirtyDaysAgo = new Date();
+                      thirtyDaysAgo.setDate(today.getDate() - 30);
+                      const tStr = thirtyDaysAgo < accountCreatedAt ? accountCreatedAtStr : thirtyDaysAgo.toISOString().split("T")[0];
+                      setStartDate(tStr);
+                      setEndDate(todayStr);
+                      setCurrentPage(1);
+                    }}
+                    title="Reset Filters"
+                  >
+                    <RotateCcw className="h-4 w-4 text-muted-foreground" />
                   </Button>
                 </div>
               </div>
-              <div className="rounded-md border overflow-x-auto">
+            </CardContent>
+          </Card>
+
+          <Card className="border shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg sm:text-xl">Attendance Details</CardTitle>
+                <CardDescription>
+                  Daily attendance records for the selected date range.
+                </CardDescription>
+              </div>
+              <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                {formattedAttendanceRows.length} Records
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Check-In</TableHead>
-                      <TableHead>Check-Out</TableHead>
-                      <TableHead>Total Hours</TableHead>
-                      <TableHead>Work Mode</TableHead>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="font-semibold text-foreground text-center">Date</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Check-In</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Check-Out</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Total Hours</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Work Mode</TableHead>
+                      <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {attendanceLoading ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">
-                          Loading attendance...
+                        <TableCell colSpan={6} className="h-40 text-center">
+                          <div className="flex flex-col items-center justify-center gap-3">
+                            <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+                            <span className="text-muted-foreground font-medium">Fetching records...</span>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : formattedAttendanceRows.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center py-6 text-sm text-muted-foreground">
-                          No attendance records found for this period.
+                        <TableCell colSpan={6} className="h-40 text-center">
+                          <div className="flex flex-col items-center justify-center gap-2 text-muted-foreground">
+                            <Calendar className="h-10 w-10 opacity-20" />
+                            <span className="font-medium">No records found for the selected period.</span>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ) : (
-                      formattedAttendanceRows.map((row) => (
+                      paginatedRows.map((row) => (
                         <TableRow
                           key={row.id}
-                          className={
-                            row.isLeave
-                              ? "bg-red-50 text-red-900 dark:bg-red-550 dark:text-red-600"
-                              : ""
-                          }
+                          className="hover:bg-muted/30 transition-colors border-b last:border-0"
                         >
-                          <TableCell>{row.dateLabel}</TableCell>
-                          <TableCell>{row.checkIn}</TableCell>
-                          <TableCell>{row.checkOut}</TableCell>
-                          <TableCell>{row.totalHours}</TableCell>
-                          <TableCell>{row.workMode}</TableCell>
+                          <TableCell className="font-medium text-foreground text-center">
+                            {new Date(row.dateLabel).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Clock className="h-3.5 w-3.5 opacity-60" />
+                              {row.checkIn}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <Clock className="h-3.5 w-3.5 opacity-60" />
+                              {row.checkOut}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
+                              {row.totalHours}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-center">
+                            {row.workMode === "Office" ? (
+                              <Badge variant="outline" className="font-normal">Office</Badge>
+                            ) : row.workMode === "WFH" ? (
+                              <Badge variant="outline" className="font-normal">Remote</Badge>
+                            ) : (
+                              <span className="opacity-60">{row.workMode}</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {getStatusBadge(row.status)}
+                          </TableCell>
                         </TableRow>
                       ))
                     )}
                   </TableBody>
                 </Table>
               </div>
+
+              {/* Pagination Controls */}
+              {!attendanceLoading && formattedAttendanceRows.length > 0 && (
+                <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card">
+                  <div className="text-sm text-muted-foreground">
+                    Showing <span className="font-semibold text-foreground">
+                      {(currentPage - 1) * itemsPerPage + 1}
+                    </span> to{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(currentPage * itemsPerPage, formattedAttendanceRows.length)}
+                    </span> of{" "}
+                    <span className="font-semibold text-foreground">{formattedAttendanceRows.length}</span> records
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) pageNum = i + 1;
+                        else if (currentPage <= 3) pageNum = i + 1;
+                        else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                        else pageNum = currentPage - 2 + i;
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            className={`h-8 w-8 p-0 ${currentPage === pageNum ? "shadow-sm" : ""}`}
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

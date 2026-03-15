@@ -43,13 +43,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Check, X, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { API_BASE_URL } from "@/constant/Config";
 
 type LeaveStatus = "pending" | "approved" | "rejected" | "cancelled";
-type LeaveFilter = LeaveStatus | "all";
+type LeaveFilter = "pending" | "approved" | "rejected" | "all";
 
 interface AdminLeaveRequest {
   id: string;
@@ -135,22 +135,24 @@ export const AdminLeaveRequests = () => {
           return;
         }
 
-        const mapped: AdminLeaveRequest[] = json.leaveRequests.map((r) => ({
-          id: String(r._id),
-          employeeName: r.userId?.name || "Unknown",
-          employeeEmail: r.userId?.email || "",
-          employeeId: r.userId?.employeeId || "",
-          type: r.leaveType || "other",
-          startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
-          endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
-          days: r.totalDays || 0,
-          reason: r.reason || "",
-          payType: r.payType || "paid",
-          status: r.status as LeaveStatus,
-          submittedAt: r.createdAt,
-          approvedByName: r.approvedBy?.name,
-          approvedByEmail: r.approvedBy?.email,
-        }));
+        const mapped: AdminLeaveRequest[] = json.leaveRequests
+          .filter((r: any) => r.status !== "cancelled")
+          .map((r: any) => ({
+            id: String(r._id),
+            employeeName: r.userId?.name || "Unknown",
+            employeeEmail: r.userId?.email || "",
+            employeeId: r.userId?.employeeId || "",
+            type: r.leaveType || "other",
+            startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
+            endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
+            days: r.totalDays || 0,
+            reason: r.reason || "",
+            payType: r.payType || "paid",
+            status: r.status as LeaveStatus,
+            submittedAt: r.createdAt,
+            approvedByName: r.approvedBy?.name,
+            approvedByEmail: r.approvedBy?.email,
+          }));
 
         setRequests(mapped);
         setTotalPages(json.pagination?.totalPages || 1);
@@ -310,11 +312,10 @@ export const AdminLeaveRequests = () => {
                       <SelectValue placeholder="Filter by status" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
                       <SelectItem value="pending">Pending</SelectItem>
                       <SelectItem value="approved">Approved</SelectItem>
                       <SelectItem value="rejected">Rejected</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                      <SelectItem value="all">All</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -329,40 +330,51 @@ export const AdminLeaveRequests = () => {
                 <>
                   <div className="rounded-lg border overflow-x-auto">
                     <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Employee</TableHead>
-                          <TableHead className="whitespace-nowrap">
+                      <TableHeader className="bg-muted/50">
+                        <TableRow className="hover:bg-transparent">
+                          <TableHead className="w-[80px] font-semibold text-foreground text-center">
+                            Sr No
+                          </TableHead>
+                          <TableHead className="font-semibold text-foreground text-center">
+                            Employee
+                          </TableHead>
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Type
                           </TableHead>
-                          <TableHead className="whitespace-nowrap">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Pay Type
                           </TableHead>
-                          <TableHead className="whitespace-nowrap">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Dates
                           </TableHead>
-                          <TableHead className="whitespace-nowrap">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Days
                           </TableHead>
-                          <TableHead className="whitespace-nowrap">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Status
                           </TableHead>
-                          <TableHead className="whitespace-nowrap hidden lg:table-cell">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap hidden lg:table-cell">
                             Submitted
                           </TableHead>
-                          <TableHead className="whitespace-nowrap hidden lg:table-cell">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap hidden lg:table-cell">
                             Processed By
                           </TableHead>
-                          <TableHead className="text-right whitespace-nowrap">
+                          <TableHead className="font-semibold text-foreground text-center whitespace-nowrap">
                             Actions
                           </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredRequests.map((request) => (
-                          <TableRow key={request.id}>
-                            <TableCell>
-                              <div className="flex flex-col">
+                        {filteredRequests.map((request, index) => (
+                          <TableRow
+                            key={request.id}
+                            className="hover:bg-muted/30 transition-colors border-b last:border-0"
+                          >
+                            <TableCell className="text-center font-medium">
+                              {(currentPage - 1) * pageSize + index + 1}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex flex-col items-center">
                                 <span className="font-medium truncate">
                                   {request.employeeName}
                                 </span>
@@ -371,18 +383,21 @@ export const AdminLeaveRequests = () => {
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <span className="text-sm">
                                 {request.type.charAt(0).toUpperCase() +
                                   request.type.slice(1)}
                               </span>
                             </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="capitalize">
+                            <TableCell className="text-center">
+                              <Badge
+                                variant="outline"
+                                className="capitalize bg-muted/30"
+                              >
                                 {request.payType}
                               </Badge>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <div className="text-sm">
                                 <div className="truncate">
                                   {request.startDate} -
@@ -392,19 +407,26 @@ export const AdminLeaveRequests = () => {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <span className="font-medium text-sm">
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
                                 {request.days}
                               </span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <Badge
                                 variant={getStatusBadgeVariant(request.status)}
+                                className={
+                                  request.status === "approved"
+                                    ? "bg-green-500/10 text-green-500 border-green-500/20"
+                                    : request.status === "rejected"
+                                    ? "bg-red-500/10 text-red-500 border-red-500/20"
+                                    : "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                }
                               >
                                 {getStatusLabel(request.status)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell">
+                            <TableCell className="text-center hidden lg:table-cell">
                               <span className="text-sm text-muted-foreground whitespace-nowrap">
                                 {request.submittedAt &&
                                 !isNaN(new Date(request.submittedAt).getTime())
@@ -415,9 +437,9 @@ export const AdminLeaveRequests = () => {
                                   : "N/A"}
                               </span>
                             </TableCell>
-                            <TableCell className="hidden lg:table-cell">
+                            <TableCell className="text-center hidden lg:table-cell">
                               {request.approvedByName ? (
-                                <div className="flex flex-col">
+                                <div className="flex flex-col items-center">
                                   <span className="text-sm">
                                     {request.approvedByName}
                                   </span>
@@ -431,30 +453,47 @@ export const AdminLeaveRequests = () => {
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {request.status === "pending" && (
+                            <TableCell className="text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                {request.status === "pending" ? (
                                   <>
                                     <Button
                                       size="sm"
-                                      variant="outline"
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                                       onClick={() =>
                                         openActionDialog(request, "approve")
                                       }
+                                      title="Approve"
                                     >
-                                      Approve
+                                      <Check className="h-4 w-4" />
                                     </Button>
                                     <Button
                                       size="sm"
                                       variant="ghost"
-                                      className="text-destructive"
+                                      className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
                                       onClick={() =>
                                         openActionDialog(request, "reject")
                                       }
+                                      title="Reject"
                                     >
-                                      Reject
+                                      <X className="h-4 w-4" />
                                     </Button>
                                   </>
+                                ) : request.status === "approved" ? (
+                                  <div
+                                    className="flex items-center justify-center h-8 w-8 rounded-full bg-green-50 text-green-600"
+                                    title="Approved"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="flex items-center justify-center h-8 w-8 rounded-full bg-red-50 text-red-600"
+                                    title="Rejected"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </div>
                                 )}
                               </div>
                             </TableCell>
@@ -464,100 +503,75 @@ export const AdminLeaveRequests = () => {
                     </Table>
                   </div>
 
-                  <div className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="text-xs text-muted-foreground">
-                      Showing {startIndex}–{endIndex}
+                  {/* Attendance tracking style pagination */}
+                  <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card mt-4">
+                    <div className="text-sm text-muted-foreground">
+                      Showing{" "}
+                      <span className="font-semibold text-foreground">
+                        {(currentPage - 1) * pageSize + 1}
+                      </span>{" "}
+                      to{" "}
+                      <span className="font-semibold text-foreground">
+                        {Math.min(currentPage * pageSize, filteredRequests.length)}
+                      </span>{" "}
+                      of{" "}
+                      <span className="font-semibold text-foreground">
+                        {filteredRequests.length}
+                      </span>{" "}
+                      records
                     </div>
-                    <Pagination>
-                      <PaginationContent>
-                        <PaginationItem>
-                          <PaginationPrevious
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage((prev) => Math.max(prev - 1, 1));
-                            }}
-                            isActive={false}
-                          />
-                        </PaginationItem>
-                        {totalPages <= 3 &&
-                          Array.from({ length: totalPages }, (_, index) => (
-                            <PaginationItem key={index + 1}>
-                              <PaginationLink
-                                href="#"
-                                isActive={currentPage === index + 1}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setCurrentPage(index + 1);
-                                }}
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="h-8 px-2"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+
+                      <div className="flex items-center gap-1">
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            let pageNum;
+                            if (totalPages <= 5) pageNum = i + 1;
+                            else if (currentPage <= 3) pageNum = i + 1;
+                            else if (currentPage >= totalPages - 2)
+                              pageNum = totalPages - 4 + i;
+                            else pageNum = currentPage - 2 + i;
+
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={
+                                  currentPage === pageNum ? "default" : "outline"
+                                }
+                                size="sm"
+                                className={`h-8 w-8 p-0 ${
+                                  currentPage === pageNum ? "shadow-sm" : ""
+                                }`}
+                                onClick={() => setCurrentPage(pageNum)}
                               >
-                                {index + 1}
-                              </PaginationLink>
-                            </PaginationItem>
-                          ))}
-                        {totalPages > 3 && (
-                          <>
-                            <PaginationItem>
-                              <PaginationLink
-                                href="#"
-                                isActive={currentPage === 1}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setCurrentPage(1);
-                                }}
-                              >
-                                1
-                              </PaginationLink>
-                            </PaginationItem>
-                            {currentPage > 2 && (
-                              <PaginationItem>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            )}
-                            {currentPage > 1 && currentPage < totalPages && (
-                              <PaginationItem>
-                                <PaginationLink
-                                  href="#"
-                                  isActive
-                                  onClick={(e) => e.preventDefault()}
-                                >
-                                  {currentPage}
-                                </PaginationLink>
-                              </PaginationItem>
-                            )}
-                            {currentPage < totalPages - 1 && (
-                              <PaginationItem>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            )}
-                            <PaginationItem>
-                              <PaginationLink
-                                href="#"
-                                isActive={currentPage === totalPages}
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setCurrentPage(totalPages);
-                                }}
-                              >
-                                {totalPages}
-                              </PaginationLink>
-                            </PaginationItem>
-                          </>
+                                {pageNum}
+                              </Button>
+                            );
+                          }
                         )}
-                        <PaginationItem>
-                          <PaginationNext
-                            href="#"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage((prev) =>
-                                Math.min(prev + 1, totalPages)
-                              );
-                            }}
-                            isActive={false}
-                          />
-                        </PaginationItem>
-                      </PaginationContent>
-                    </Pagination>
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="h-8 px-2"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </>
               ) : (

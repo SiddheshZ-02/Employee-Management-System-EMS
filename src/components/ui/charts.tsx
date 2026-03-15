@@ -28,6 +28,7 @@ import {
   TrendingUp,
   AlertCircle,
   BarChart3,
+  Clock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {  API_BASE_URL } from "@/constant/Config";
@@ -622,7 +623,8 @@ export const LiveStatsCard = () => {
     totalEmployees: 0,
     presentToday: 0,
     pendingLeaves: 0,
-    averageHours: 0,
+    currentDay: "",
+    currentDate: "",
   });
   const [loading, setLoading] = useState(true);
   const { token } = useAppSelector((state) => state.auth);
@@ -669,22 +671,20 @@ export const LiveStatsCard = () => {
         const presentToday = data.today.present ?? 0;
         const pendingLeaves = data.leaves.pending ?? 0;
 
-        let averageHours = 0;
-        const label = data.thisMonth.avgHoursPerDay;
-        if (label) {
-          const match = label.match(/(\d+)h\s+(\d+)m/);
-          if (match) {
-            const hours = parseInt(match[1], 10);
-            const minutes = parseInt(match[2], 10) || 0;
-            averageHours = Math.round((hours + minutes / 60) * 10) / 10;
-          }
-        }
+        const now = new Date();
+        const currentDay = now.toLocaleDateString("en-US", { weekday: "long" });
+        const currentDate = now.toLocaleDateString("en-US", { 
+          month: "short", 
+          day: "numeric", 
+          year: "numeric" 
+        });
 
         setStats({
           totalEmployees,
           presentToday,
           pendingLeaves,
-          averageHours,
+          currentDay,
+          currentDate,
         });
       } catch (error) {
         console.error("Error fetching live stats:", error);
@@ -746,10 +746,10 @@ export const LiveStatsCard = () => {
       textColor: "text-orange-600",
     },
     {
-      title: "Avg. Hours",
-      value: stats.averageHours,
-      suffix: "per day",
-      icon: BarChart3,
+      title: "Today's Date",
+      value: stats.currentDay,
+      suffix: stats.currentDate,
+      icon: Clock,
       color: "bg-purple-500",
       textColor: "text-purple-600",
     },

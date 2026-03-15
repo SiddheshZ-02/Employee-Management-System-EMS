@@ -44,17 +44,8 @@ import {
   setEmployees,
   type Employee,
 } from "@/store/slices/employeeSlice";
-import { Plus, Edit, Trash2, Search } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import {
-  Pagination,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationLink,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
 import { API_BASE_URL } from "@/constant/Config";
 
 interface BackendEmployee {
@@ -78,15 +69,26 @@ export const EmployeeManagement = () => {
   const navigate = useNavigate();
 
   const generateEmployeeId = () => {
-    const now = new Date();
-    const pad = (n: number) => n.toString().padStart(2, "0");
-    const y = now.getFullYear().toString();
-    const m = pad(now.getMonth() + 1);
-    const d = pad(now.getDate());
-    const h = pad(now.getHours());
-    const min = pad(now.getMinutes());
-    const s = pad(now.getSeconds());
-    return `EMP${y}${m}${d}${h}${min}${s}`;
+    if (!reduxEmployees || reduxEmployees.length === 0) {
+      return "EMP01";
+    }
+
+    // Extract numerical parts from existing IDs and find the max
+    const numericParts = reduxEmployees
+      .map((emp) => {
+        const match = emp.employeeId?.match(/^EMP(\d+)$/);
+        // If it's a very large number (like the old timestamp format), ignore it
+        if (match && match[1].length < 10) {
+          return parseInt(match[1], 10);
+        }
+        return 0;
+      })
+      .filter((n) => n > 0);
+
+    const maxId = numericParts.length > 0 ? Math.max(...numericParts) : 0;
+    const nextId = maxId + 1;
+
+    return `EMP${nextId.toString().padStart(2, "0")}`;
   };
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -382,17 +384,18 @@ export const EmployeeManagement = () => {
   };
 
   const fetchDeleteEmployee = async (employee: Employee) => {
-    if (!token) {
+    const employeeId = employee.id || employee._id;
+    if (!token || !employeeId) {
       toast({
-        title: "Not authenticated",
-        description: "Please log in again to delete employees.",
+        title: "Error",
+        description: !token ? "Please log in again." : "Invalid employee ID.",
         variant: "destructive",
       });
       return;
     }
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/admin/employees/${employee.id}`,
+        `${API_BASE_URL}/api/admin/employees/${employeeId}`,
         {
           method: "DELETE",
           headers: {
@@ -408,7 +411,7 @@ export const EmployeeManagement = () => {
         );
       }
 
-      dispatch(deleteEmployee(employee.id));
+      dispatch(deleteEmployee(employeeId as string));
       fetchEmployee();
       toast({
         title: "Employee Deleted",
@@ -468,9 +471,9 @@ export const EmployeeManagement = () => {
         return;
       }
       fetchAddEmployee();
-    } else if (editingEmployee) {
+    } else if (editingEmployee && (editingEmployee.id || editingEmployee._id)) {
       const updatePayload = {
-        id: editingEmployee.id,
+        id: (editingEmployee.id || editingEmployee._id) as string,
         name: formData.name,
         email: formData.email,
         employeeId: formData.employeeId,
@@ -519,7 +522,7 @@ export const EmployeeManagement = () => {
                       Add Employee
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto mx-4 sm:mx-0">
+                  <DialogContent className="sm:max-w-[425px] max-h-[90vh] overflow-y-auto mx-4 sm:mx-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <DialogHeader>
                       <DialogTitle>
                         {editingEmployee ? "Edit Employee" : "Add New Employee"}
@@ -719,23 +722,46 @@ export const EmployeeManagement = () => {
                 </div>
               </div>
 
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto">
                 <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Position</TableHead>
-                      <TableHead>Department</TableHead>
-                      <TableHead>Join Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                  <TableHeader className="bg-muted/50">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-[80px] font-semibold text-foreground text-center">
+                        Sr No
+                      </TableHead>
+                      <TableHead className="min-w-[150px] font-semibold text-foreground text-center">
+                        Name
+                      </TableHead>
+                      <TableHead className="min-w-[150px] font-semibold text-foreground text-center sm:table-cell">
+                        Email
+                      </TableHead>
+                      <TableHead className="min-w-[120px] font-semibold text-foreground text-center">
+                        Position
+                      </TableHead>
+                      <TableHead className="min-w-[120px] font-semibold text-foreground text-center md:table-cell">
+                        Department
+                      </TableHead>
+                      <TableHead className="min-w-[120px] font-semibold text-foreground text-center lg:table-cell">
+                        Join Date
+                      </TableHead>
+                      <TableHead className="min-w-[100px] font-semibold text-foreground text-center">
+                        Status
+                      </TableHead>
+                      <TableHead className="min-w-[120px] font-semibold text-foreground text-center">
+                        Actions
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedEmployees.map((employee) => (
-                      <TableRow key={employee.id}>
-                        <TableCell className="font-medium">
+                    {paginatedEmployees.map((employee, index) => (
+                      <TableRow
+                        key={employee.id}
+                        className="hover:bg-muted/30 transition-colors border-b last:border-0"
+                      >
+                        <TableCell className="text-center font-medium">
+                          {(currentPage - 1) * itemsPerPage + index + 1}
+                        </TableCell>
+                        <TableCell className="text-center">
                           <div className="min-w-0">
                             <div className="font-medium truncate">
                               {employee.name}
@@ -745,45 +771,57 @@ export const EmployeeManagement = () => {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className=" sm:table-cell">
+                        <TableCell className="sm:table-cell text-center">
                           <div className="truncate">{employee.email}</div>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <div className="truncate">{employee.position}</div>
                         </TableCell>
-                        <TableCell className=" md:table-cell">
+                        <TableCell className="md:table-cell text-center">
                           <div className="truncate">{employee.department}</div>
                         </TableCell>
-                        <TableCell className=" lg:table-cell">
-                          {new Date(employee.joinDate).toLocaleDateString()}
+                        <TableCell className="lg:table-cell text-center">
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">
+                            {new Date(employee.joinDate).toLocaleDateString(
+                              "en-GB"
+                            )}
+                          </span>
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="text-center">
                           <Badge
                             variant={
                               employee.status === "Active"
                                 ? "default"
                                 : "secondary"
                             }
-                            className="shrink-0"
+                            className={
+                              employee.status === "Active"
+                                ? "bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20"
+                                : "bg-secondary/10 text-secondary-foreground border-secondary/20 hover:bg-secondary/20"
+                            }
                           >
                             {employee.status}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-1">
+                        <TableCell className="text-center">
+                          <div className="flex items-center justify-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => navigate(`/admin/employees/${employee.id}`)}
-                              className="h-8 px-2"
+                              onClick={() =>
+                                navigate(`/admin/employees/${employee.id || employee._id}`)
+                              }
+                              className="h-8 w-8 p-0"
+                              title="View Details"
                             >
-                              View
+                              <Eye className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEdit(employee)}
                               className="h-8 w-8 p-0"
+                              title="Edit Employee"
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
@@ -792,6 +830,7 @@ export const EmployeeManagement = () => {
                               size="sm"
                               onClick={() => handleDelete(employee)}
                               className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                              title="Delete Employee"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -803,98 +842,83 @@ export const EmployeeManagement = () => {
                 </Table>
               </div>
 
-              {/* Advanced Pagination Controls with Ellipsis */}
-              <div className="mt-4 flex justify-center">
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage((prev) => Math.max(prev - 1, 1));
-                        }}
-                        isActive={false}
-                      />
-                    </PaginationItem>
-                    {/* Show first page */}
-                    {totalPages > 5 && currentPage > 3 && (
-                      <>
-                        <PaginationItem>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === 1}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(1);
-                            }}
-                          >
-                            1
-                          </PaginationLink>
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                      </>
-                    )}
-                    {/* Show page numbers around current page */}
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter((page) => {
-                        if (totalPages <= 5) return true;
-                        if (currentPage <= 3) return page <= 5;
-                        if (currentPage >= totalPages - 2)
-                          return page >= totalPages - 4;
-                        return Math.abs(page - currentPage) <= 2;
-                      })
-                      .map((page) => (
-                        <PaginationItem key={page}>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === page}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(page);
-                            }}
-                          >
-                            {page}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ))}
-                    {/* Show last page */}
-                    {totalPages > 5 && currentPage < totalPages - 2 && (
-                      <>
-                        <PaginationItem>
-                          <PaginationEllipsis />
-                        </PaginationItem>
-                        <PaginationItem>
-                          <PaginationLink
-                            href="#"
-                            isActive={currentPage === totalPages}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setCurrentPage(totalPages);
-                            }}
-                          >
-                            {totalPages}
-                          </PaginationLink>
-                        </PaginationItem>
-                      </>
-                    )}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setCurrentPage((prev) =>
-                            Math.min(prev + 1, totalPages)
+              {/* Attendance Tracking Style Pagination Controls */}
+              {filteredEmployees.length > 0 && (
+                <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing{" "}
+                    <span className="font-semibold text-foreground">
+                      {(currentPage - 1) * itemsPerPage + 1}
+                    </span>{" "}
+                    to{" "}
+                    <span className="font-semibold text-foreground">
+                      {Math.min(
+                        currentPage * itemsPerPage,
+                        filteredEmployees.length
+                      )}
+                    </span>{" "}
+                    of{" "}
+                    <span className="font-semibold text-foreground">
+                      {filteredEmployees.length}
+                    </span>{" "}
+                    employees
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="h-8 px-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+
+                    <div className="flex items-center gap-1">
+                      {Array.from(
+                        { length: Math.min(5, totalPages) },
+                        (_, i) => {
+                          let pageNum;
+                          if (totalPages <= 5) pageNum = i + 1;
+                          else if (currentPage <= 3) pageNum = i + 1;
+                          else if (currentPage >= totalPages - 2)
+                            pageNum = totalPages - 4 + i;
+                          else pageNum = currentPage - 2 + i;
+
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={
+                                currentPage === pageNum ? "default" : "outline"
+                              }
+                              size="sm"
+                              className={`h-8 w-8 p-0 ${
+                                currentPage === pageNum ? "shadow-sm" : ""
+                              }`}
+                              onClick={() => setCurrentPage(pageNum)}
+                            >
+                              {pageNum}
+                            </Button>
                           );
-                        }}
-                        isActive={false}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              </div>
+                        }
+                      )}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCurrentPage((p) => Math.min(totalPages, p + 1))
+                      }
+                      disabled={currentPage === totalPages}
+                      className="h-8 px-2"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import {
   Card,
@@ -14,6 +15,7 @@ import {
   Loader2,
   Check,
   Settings2,
+  ArrowLeft,
 } from "lucide-react";
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
@@ -29,6 +31,7 @@ const weekdayOptions = [
 ];
 
 export const CompanyWeekOff = () => {
+  const navigate = useNavigate();
   const { token } = useAppSelector((state) => state.auth);
 
   // Week Off State
@@ -93,6 +96,20 @@ export const CompanyWeekOff = () => {
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => navigate(-1)}
+          className="h-10 w-10 border shadow-sm"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">
+          Company Week Off
+        </h2>
+      </div>
+
       <Card className="border shadow-xl overflow-hidden">
         <div className="bg-primary/5 px-6 py-4 border-b">
           <CardTitle className="text-xl flex items-center gap-2">

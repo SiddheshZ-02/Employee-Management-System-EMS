@@ -1,4 +1,5 @@
 import { useEffect, useCallback, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { useAppDispatch } from "@/hooks/useAppDispatch";
 import {
@@ -24,6 +25,7 @@ import {
   Edit,
   Trash2,
   Loader2,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/api";
@@ -91,6 +93,7 @@ const getHolidayColor = (index: number) => {
 };
 
 export const CompanyHolidays = () => {
+  const navigate = useNavigate();
   const { token } = useAppSelector((state) => state.auth);
   const { holidays, loading: holidayLoading } = useAppSelector(
     (state) => state.holiday
@@ -264,23 +267,34 @@ export const CompanyHolidays = () => {
 
   return (
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
-      <div className="space-y-8">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="h-10 w-10 border shadow-sm"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <div className="space-y-1">
             <h2 className="text-2xl font-bold tracking-tight">
               Holiday Calendar
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Schedule upcoming company-wide holidays and observances.
             </p>
           </div>
-          <Button
-            onClick={() => handleOpenHolidayDialog()}
-            className="shadow-lg shadow-primary/20 hover:scale-105 transition-all"
-          >
-            <Plus className="mr-2 h-4 w-4" /> Add New Holiday
-          </Button>
         </div>
+        <Button
+          onClick={() => handleOpenHolidayDialog()}
+          className="shadow-lg shadow-primary/20 hover:scale-105 transition-all w-full sm:w-auto"
+        >
+          <Plus className="mr-2 h-4 w-4" /> Add New Holiday
+        </Button>
+      </div>
+
+      <div className="space-y-8">
 
         {holidayLoading && holidays.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-24 space-y-4">
@@ -412,10 +426,18 @@ export const CompanyHolidays = () => {
               <Input
                 id="date"
                 type="date"
+                className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
                 value={holidayForm.date}
                 onChange={(e) =>
                   setHolidayForm({ ...holidayForm, date: e.target.value })
                 }
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.showPicker();
+                  } catch (err) {
+                    console.debug("showPicker not supported", err);
+                  }
+                }}
                 required
               />
             </div>
