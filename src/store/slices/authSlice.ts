@@ -14,6 +14,7 @@ export interface User {
   department?: string;
   phone?: string;
   avatar?: string;
+  createdAt?: string;
 }
 
 export interface AuthState {

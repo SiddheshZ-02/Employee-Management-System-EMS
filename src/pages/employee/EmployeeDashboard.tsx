@@ -34,12 +34,14 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ReferenceLine,
 } from "recharts";
 
 export const EmployeeDashboard = () => {
   const { user, token } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const [hoursToday, setHoursToday] = useState("0h 0m");
+  const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [leaveBalance, setLeaveBalance] = useState(0);
   const [monthAttendance, setMonthAttendance] = useState<{
     attended: number;
@@ -51,6 +53,8 @@ export const EmployeeDashboard = () => {
   const [activities, setActivities] = useState<any[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  const [holidays, setHolidaysState] = useState<any[]>([]);
 
   useEffect(() => {
     if (!token) {
@@ -58,7 +62,12 @@ export const EmployeeDashboard = () => {
     }
     const loadData = async () => {
       try {
-        const todayStr = new Date().toISOString().split("T")[0];
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
+
         const [todayRes, historyRes, leaveRes, balanceRes, activityRes, holidayRes] = await Promise.all(
           [
             fetch(`${API_BASE_URL}/api/attendance/today`, {
@@ -85,16 +94,19 @@ export const EmployeeDashboard = () => {
           ]
         );
 
+        let currentWeekRecords = [];
+        let currentLeaves = [];
+        let currentHolidays = [];
+
         if (todayRes.ok) {
           const todayJson = await todayRes.json();
-          if (
-            todayJson.success &&
-            todayJson.stats &&
-            todayJson.stats.totalHours
-          ) {
-            setHoursToday(todayJson.stats.totalHours);
-          } else {
-            setHoursToday("0h 0m");
+          if (todayJson.success) {
+            if (todayJson.stats && todayJson.stats.totalHours) {
+              setHoursToday(todayJson.stats.totalHours);
+            } else {
+              setHoursToday("0h 0m");
+            }
+            setIsCheckedIn(todayJson.hasCheckedIn && !todayJson.hasCheckedOut);
           }
         }
 
@@ -107,31 +119,69 @@ export const EmployeeDashboard = () => {
             const end = endOfMonth(now);
             const totalDays = differenceInDays(end, start) + 1;
             setMonthAttendance({ attended, totalDays });
-
-            // Calculate current week's data (Monday to Sunday)
-            const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-            const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-            const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
-
-            const weekRecords = historyJson.records || [];
-            const weeklyStats = daysInWeek.map((day) => {
-              const dayStr = format(day, "yyyy-MM-dd");
-              const record = weekRecords.find((r: any) => r.date === dayStr);
-              return {
-                day: format(day, "EEE"),
-                hours: record ? (record.workingHours || 0).toFixed(1) : "0.0",
-              };
-            });
-            setWeeklyData(weeklyStats);
+            currentWeekRecords = historyJson.records || [];
           }
         }
 
         if (leaveRes.ok) {
           const leaveJson = await leaveRes.json();
-          if (leaveJson.success && leaveJson.summary) {
-            // Summary is handled differently now with actual balances
+          if (leaveJson.success && Array.isArray(leaveJson.leaveRequests)) {
+            currentLeaves = leaveJson.leaveRequests;
+            setLeaves(leaveJson.leaveRequests);
           }
         }
+
+        if (holidayRes.ok) {
+          const holidayJson = await holidayRes.json();
+          if (holidayJson.success && holidayJson.holidays) {
+            currentHolidays = holidayJson.holidays;
+            setHolidaysState(holidayJson.holidays);
+            dispatch(setHolidays(holidayJson.holidays));
+          }
+        }
+
+        // Now calculate weekly data with all available information
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+        const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+        const weeklyStats = daysInWeek.map((day) => {
+          const dayStr = format(day, "yyyy-MM-dd");
+          const record = currentWeekRecords.find((r: any) => r.date === dayStr);
+          const hours = record ? parseFloat((record.workingHours || 0).toFixed(1)) : 0;
+          
+          // Determine status
+          let status = "none";
+          const isHoliday = currentHolidays.some((h: any) => h.date === dayStr);
+          const isLeave = currentLeaves.some((l: any) => 
+            l.status === "approved" && 
+            dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") && 
+            dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd")
+          );
+          const isWeekOff = day.getDay() === 0 || day.getDay() === 6; // Sun = 0, Sat = 6
+
+          if (hours > 0) {
+            status = "present";
+          } else if (isHoliday) {
+            status = "holiday";
+          } else if (isLeave) {
+            status = "leave";
+          } else if (isWeekOff) {
+            status = "weekoff";
+          } else if (day < now && !isSameDay(day, now)) {
+            status = "absent";
+          }
+
+          return {
+            day: format(day, "EEE"),
+            fullDate: format(day, "MMMM do"),
+            hours: hours,
+            displayHours: hours,
+            isToday: isSameDay(day, now),
+            status: status,
+          };
+        });
+        setWeeklyData(weeklyStats);
 
         if (balanceRes.ok) {
           const balanceJson = await balanceRes.json();
@@ -150,13 +200,6 @@ export const EmployeeDashboard = () => {
             setActivities(activityJson.activities);
           }
         }
-
-        if (holidayRes.ok) {
-          const holidayJson = await holidayRes.json();
-          if (holidayJson.success && holidayJson.holidays) {
-            dispatch(setHolidays(holidayJson.holidays));
-          }
-        }
       } catch {
         return;
       } finally {
@@ -165,6 +208,101 @@ export const EmployeeDashboard = () => {
     };
     loadData();
   }, [token, dispatch]);
+
+  // Periodic update for "Hours Today" while checked in
+  useEffect(() => {
+    if (!token || !isCheckedIn) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, "0");
+        const day = String(now.getDate()).padStart(2, "0");
+        const todayStr = `${year}-${month}-${day}`;
+
+        const [todayRes, historyRes, activityRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/attendance/today`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/api/attendance/history?period=month`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch(`${API_BASE_URL}/api/activity/today?date=${todayStr}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
+
+        if (todayRes.ok) {
+          const data = await todayRes.json();
+          if (data.success && data.stats && data.stats.totalHours) {
+            setHoursToday(data.stats.totalHours);
+            setIsCheckedIn(data.hasCheckedIn && !data.hasCheckedOut);
+          }
+        }
+
+        if (historyRes.ok) {
+          const historyJson = await historyRes.json();
+          if (historyJson.success && historyJson.records) {
+            const now = new Date();
+            const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+            const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+            const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+            const weekRecords = historyJson.records || [];
+            
+            const weeklyStats = daysInWeek.map((day) => {
+              const dayStr = format(day, "yyyy-MM-dd");
+              const record = weekRecords.find((r: any) => r.date === dayStr);
+              const hours = record ? parseFloat((record.workingHours || 0).toFixed(1)) : 0;
+              
+              // Determine status
+              let status = "none";
+              const isHoliday = holidays.some((h: any) => h.date === dayStr);
+              const isLeave = leaves.some((l: any) => 
+                l.status === "approved" && 
+                dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") && 
+                dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd")
+              );
+              const isWeekOff = day.getDay() === 0 || day.getDay() === 6; // Sun = 0, Sat = 6
+
+              if (hours > 0) {
+                status = "present";
+              } else if (isHoliday) {
+                status = "holiday";
+              } else if (isLeave) {
+                status = "leave";
+              } else if (isWeekOff) {
+                status = "weekoff";
+              } else if (day < now && !isSameDay(day, now)) {
+                status = "absent";
+              }
+
+              return {
+                day: format(day, "EEE"),
+                fullDate: format(day, "MMMM do"),
+                hours: hours,
+                displayHours: hours,
+                isToday: isSameDay(day, now),
+                status: status,
+              };
+            });
+            setWeeklyData(weeklyStats);
+          }
+        }
+
+        if (activityRes.ok) {
+          const activityJson = await activityRes.json();
+          if (activityJson.success && activityJson.activities) {
+            setActivities(activityJson.activities);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to refresh dashboard data", err);
+      }
+    }, 60000); // refresh every minute
+
+    return () => clearInterval(interval);
+  }, [token, isCheckedIn, holidays, leaves]);
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -399,21 +537,29 @@ export const EmployeeDashboard = () => {
               </CardContent>
             </Card>
 
-            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden lg:col-span-2">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2">
-                  <div className="p-2 rounded-full bg-blue-500/10">
-                    <TrendingUp className="h-5 w-5 text-blue-600" />
+            <Card className="hover-lift transition-smooth border-0 shadow-lg overflow-hidden lg:col-span-2 flex flex-col">
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center gap-2">
+                    <div className="p-2 rounded-full bg-blue-500/10">
+                      <TrendingUp className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <span>Weekly Attendance</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Working hours for the current week
+                  </CardDescription>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <div className="text-2xl font-bold text-primary">
+                    {weeklyData.reduce((sum, d) => sum + (d.status === 'present' ? d.hours : 0), 0).toFixed(1)}h
                   </div>
-                  <span>Weekly Attendance</span>
-                </CardTitle>
-                <CardDescription>
-                  Working hours for the current week
-                </CardDescription>
+                  <div className="text-xs text-muted-foreground">Total this week</div>
+                </div>
               </CardHeader>
-              <CardContent className="h-[250px] mt-4">
+              <CardContent className="h-[280px] mt-2 relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyData}>
+                  <BarChart data={weeklyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
@@ -424,6 +570,7 @@ export const EmployeeDashboard = () => {
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: "#888", fontSize: 12 }}
+                      dy={10}
                     />
                     <YAxis
                       axisLine={false}
@@ -434,24 +581,105 @@ export const EmployeeDashboard = () => {
                       ticks={[0, 4, 8, 12, 16, 20, 24]}
                     />
                     <Tooltip
-                      cursor={false}
-                      contentStyle={{
-                        borderRadius: "8px",
-                        border: "none",
-                        boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                      cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          const getStatusColor = (status: string) => {
+                            switch (status) {
+                              case "present": return "bg-green-500";
+                              case "leave": return "bg-orange-500";
+                              case "holiday": return "bg-blue-500";
+                              case "absent": return "bg-red-500";
+                              case "weekoff": return "bg-yellow-500";
+                              default: return "bg-slate-300";
+                            }
+                          };
+                          const getStatusText = (status: string) => {
+                            switch (status) {
+                              case "present": return "Present";
+                              case "leave": return "On Leave";
+                              case "holiday": return "Holiday";
+                              case "absent": return "Absent";
+                              case "weekoff": return "Week Off";
+                              default: return "No Data";
+                            }
+                          };
+                          return (
+                            <div className="bg-white p-3 shadow-xl rounded-lg border border-slate-100 animate-in fade-in zoom-in duration-200">
+                              <p className="text-xs font-semibold text-slate-500 mb-1">{data.fullDate}</p>
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${getStatusColor(data.status)}`} />
+                                <p className="text-sm font-bold text-slate-900">{getStatusText(data.status)}</p>
+                              </div>
+                              {data.status === "present" && (
+                                <p className="text-xs text-slate-500 mt-1">{data.displayHours} Working Hours</p>
+                              )}
+                              {data.isToday && <p className="text-[10px] text-purple-600 font-medium mt-1">Today</p>}
+                            </div>
+                          );
+                        }
+                        return null;
                       }}
                     />
-                    <Bar dataKey="hours" radius={[4, 4, 0, 0]} barSize={30}>
-                      {weeklyData.map((entry, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={entry.hours > 0 ? "#3b82f6" : "#e2e8f0"}
-                        />
-                      ))}
+                    <Bar dataKey="hours" radius={[6, 6, 0, 0]} barSize={50} minPointSize={6}>
+                      {weeklyData.map((entry, index) => {
+                        let fill = "#f1f5f9";
+                        
+                        switch (entry.status) {
+                          case "present":
+                            fill = "#22c55e";
+                            break;
+                          case "leave":
+                            fill = "#f97316";
+                            break;
+                          case "holiday":
+                            fill = "#3b82f6";
+                            break;
+                          case "absent":
+                            fill = "#ef4444";
+                            break;
+                          case "weekoff":
+                            fill = "#eab308";
+                            break;
+                        }
+
+                        return (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={fill}
+                            stroke={fill}
+                            strokeWidth={entry.isToday ? 2 : 0}
+                            fillOpacity={1}
+                          />
+                        );
+                      })}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
+              <div className="px-6 pb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[11px] text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-green-500" />
+                  <span>Present</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-orange-500" />
+                  <span>Leave</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-blue-500" />
+                  <span>Holiday</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-red-500" />
+                  <span>Absent</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-sm bg-yellow-500" />
+                  <span>Week Off</span>
+                </div>
+              </div>
             </Card>
           </div>
         </div>

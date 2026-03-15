@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree } from "lucide-react";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Info } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { toast } from "sonner";
@@ -14,8 +14,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/constant/Config";
 import { Badge } from "@/components/ui/badge";
+import { apiRequest } from "@/lib/api";
+import { format, isWithinInterval, parseISO, startOfDay } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-type DayStatus = "Present" | "Leave" | "Week Off" | "Holiday";
+type DayStatus = "Present" | "Absent" | "Leave" | "Week Off" | "Holiday" | "Half Day";
 
 interface CalendarDay {
   date: string;
@@ -24,13 +32,16 @@ interface CalendarDay {
   checkInTime?: string | null;
   checkOutTime?: string | null;
   workingHours?: number;
+  isWorkOnLeave?: boolean;
 }
 
 interface CalendarResponse {
   success: boolean;
   days: CalendarDay[];
   statistics: {
+    totalDays: number;
     presentDays: number;
+    absentDays: number;
     leaveDays: number;
     weekOffDays: number;
     holidayDays: number;
@@ -48,11 +59,13 @@ interface AttendanceRow {
   workMode: string;
   totalLabel: string;
   status: DayStatus;
+  isWorkOnLeave?: boolean;
 }
 
 interface Summary {
   totalDays: number;
   presentDays: number;
+  absentDays: number;
   leaveDays: number;
   weekOffDays: number;
   holidayDays: number;
@@ -60,15 +73,21 @@ interface Summary {
 }
 
 const AttendanceTracking = () => {
-  const { token } = useAppSelector((state) => state.auth);
+  const { token, user } = useAppSelector((state) => state.auth);
+
+  // Use user's creation date as the minimum possible date for attendance
+  const accountCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date("2024-01-01");
+  const accountCreatedAtStr = accountCreatedAt.toISOString().split("T")[0];
 
   // Calculate default 30 days range
   const today = new Date();
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(today.getDate() - 30);
 
+  // If account was created less than 30 days ago, use creation date as start
+  const defaultStartDate = thirtyDaysAgo < accountCreatedAt ? accountCreatedAtStr : thirtyDaysAgo.toISOString().split("T")[0];
+
   const todayStr = today.toISOString().split("T")[0];
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -76,18 +95,21 @@ const AttendanceTracking = () => {
   const [sortKey, setSortKey] = useState<SortKey>("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [currentPage, setCurrentPage] = useState(1);
+  const [leaves, setLeaves] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
   const [summary, setSummary] = useState<Summary>({
     totalDays: 0,
     presentDays: 0,
+    absentDays: 0,
     leaveDays: 0,
     weekOffDays: 0,
     holidayDays: 0,
     totalHoursLabel: "0h 0m",
   });
 
-  const [filterStart, setFilterStart] = useState<string>(thirtyDaysAgoStr);
+  const [filterStart, setFilterStart] = useState<string>(defaultStartDate);
   const [filterEnd, setFilterEnd] = useState<string>(todayStr);
-  const [startDate, setStartDate] = useState<string>(thirtyDaysAgoStr);
+  const [startDate, setStartDate] = useState<string>(defaultStartDate);
   const [endDate, setEndDate] = useState<string>(todayStr);
 
   const fetchAttendance = useCallback(async () => {
@@ -97,6 +119,7 @@ const AttendanceTracking = () => {
     setLoading(true);
     setError(null);
     try {
+      // Fetch attendance from backend
       const params = new URLSearchParams();
       if (startDate) {
         params.append("startDate", startDate);
@@ -104,23 +127,23 @@ const AttendanceTracking = () => {
       if (endDate) {
         params.append("endDate", endDate);
       }
-      const res = await fetch(
-        `${API_BASE_URL}/api/attendance/calendar?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      if (!res.ok) {
+
+      const attendanceRes = await fetch(`${API_BASE_URL}/api/attendance/calendar?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!attendanceRes.ok) {
         throw new Error("Failed to load attendance");
       }
-      const data: CalendarResponse = await res.json();
+      
+      const data: CalendarResponse = await attendanceRes.json();
+      
       if (!data.success || !Array.isArray(data.days)) {
         setRows([]);
         setSummary({
           totalDays: 0,
           presentDays: 0,
+          absentDays: 0,
           leaveDays: 0,
           weekOffDays: 0,
           holidayDays: 0,
@@ -171,17 +194,20 @@ const AttendanceTracking = () => {
           workMode,
           totalLabel,
           status: day.status,
+          isWorkOnLeave: day.isWorkOnLeave,
         };
       });
 
       setRows(mapped);
 
+      // Use pre-calculated summary stats from backend
       setSummary({
-        totalDays: data.days.length,
+        totalDays: data.statistics.totalDays,
         presentDays: data.statistics.presentDays,
+        absentDays: data.statistics.absentDays,
         leaveDays: data.statistics.leaveDays,
         weekOffDays: data.statistics.weekOffDays,
-        holidayDays: data.statistics.holidayDays || 0,
+        holidayDays: data.statistics.holidayDays,
         totalHoursLabel: data.statistics.totalHours,
       });
     } catch (err) {
@@ -189,6 +215,7 @@ const AttendanceTracking = () => {
       setSummary({
         totalDays: 0,
         presentDays: 0,
+        absentDays: 0,
         leaveDays: 0,
         weekOffDays: 0,
         holidayDays: 0,
@@ -245,17 +272,40 @@ const AttendanceTracking = () => {
   };
 
   const resetFilters = () => {
-    setFilterStart(thirtyDaysAgoStr);
+    setFilterStart(defaultStartDate);
     setFilterEnd(todayStr);
-    setStartDate(thirtyDaysAgoStr);
+    setStartDate(defaultStartDate);
     setEndDate(todayStr);
     setCurrentPage(1);
   };
 
-  const getStatusBadge = (status: DayStatus) => {
+  const getStatusBadge = (status: DayStatus, isWorkOnLeave?: boolean) => {
     switch (status) {
       case "Present":
-        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20">Present</Badge>;
+        return (
+          <div className="flex flex-col items-center gap-1">
+            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20">Present</Badge>
+            {isWorkOnLeave && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-[10px] py-0 px-1 border-amber-500/50 text-amber-600 bg-amber-50/50 cursor-help">
+                      Work on Leave
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="text-xs">Worked on an approved leave day.</p>
+                    <p className="text-[10px] text-muted-foreground">Balance should be adjusted by HR.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+        );
+      case "Absent":
+        return <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 hover:bg-orange-500/20">Absent</Badge>;
+      case "Half Day":
+        return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20 hover:bg-purple-500/20">Half Day</Badge>;
       case "Leave":
         return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Leave</Badge>;
       case "Week Off":
@@ -297,31 +347,31 @@ const AttendanceTracking = () => {
         <Card className="border shadow-sm bg-card overflow-hidden relative">
           <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Present Days</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Present</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{summary.presentDays}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total worked days</p>
+            <p className="text-xs text-muted-foreground mt-1">Total present days</p>
           </CardContent>
         </Card>
 
         <Card className="border shadow-sm bg-card overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
+          <div className="absolute top-0 left-0 w-1 h-full bg-orange-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Leave Days</CardTitle>
-            <Calendar className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Absent</CardTitle>
+            <div className="h-4 w-4 rounded-full border-2 border-orange-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{summary.leaveDays}</div>
-            <p className="text-xs text-muted-foreground mt-1">Excluding holidays</p>
+            <div className="text-2xl font-bold text-foreground">{summary.absentDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Days not marked</p>
           </CardContent>
         </Card>
 
         <Card className="border shadow-sm bg-card overflow-hidden relative">
           <div className="absolute top-0 left-0 w-1 h-full bg-yellow-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Week Offs</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Weekoff</CardTitle>
             <Calendar className="h-4 w-4 text-yellow-500" />
           </CardHeader>
           <CardContent>
@@ -331,14 +381,14 @@ const AttendanceTracking = () => {
         </Card>
 
         <Card className="border shadow-sm bg-card overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+          <div className="absolute top-0 left-0 w-1 h-full bg-red-500" />
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Holidays</CardTitle>
-            <Palmtree className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Leaves</CardTitle>
+            <Palmtree className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-foreground">{summary.holidayDays}</div>
-            <p className="text-xs text-muted-foreground mt-1">Company holidays</p>
+            <div className="text-2xl font-bold text-foreground">{summary.leaveDays}</div>
+            <p className="text-xs text-muted-foreground mt-1">Approved leaves</p>
           </CardContent>
         </Card>
 
@@ -350,7 +400,7 @@ const AttendanceTracking = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">{summary.totalHoursLabel}</div>
-            <p className="text-xs text-muted-foreground mt-1">Calculate work time</p>
+            <p className="text-xs text-muted-foreground mt-1">Total work time</p>
           </CardContent>
         </Card>
       </div>
@@ -373,6 +423,7 @@ const AttendanceTracking = () => {
                   type="date"
                   className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   value={filterStart}
+                  min={accountCreatedAtStr}
                   max={todayStr}
                   onChange={(e) => setFilterStart(e.target.value)}
                   onClick={(e) => {
@@ -393,6 +444,7 @@ const AttendanceTracking = () => {
                   type="date"
                   className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [appearance:none] [&::-webkit-calendar-picker-indicator]:opacity-0 [&::-webkit-calendar-picker-indicator]:absolute [&::-webkit-calendar-picker-indicator]:right-0 [&::-webkit-calendar-picker-indicator]:w-full [&::-webkit-calendar-picker-indicator]:h-full [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                   value={filterEnd}
+                  min={accountCreatedAtStr}
                   max={todayStr}
                   onChange={(e) => setFilterEnd(e.target.value)}
                   onClick={(e) => {
@@ -536,7 +588,7 @@ const AttendanceTracking = () => {
                           <span className="opacity-60">{row.workMode}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">{getStatusBadge(row.status)}</TableCell>
+                      <TableCell className="text-center">{getStatusBadge(row.status, row.isWorkOnLeave)}</TableCell>
                     </TableRow>
                   ))
                 )}

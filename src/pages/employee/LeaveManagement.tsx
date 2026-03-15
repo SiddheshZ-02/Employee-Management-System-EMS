@@ -51,7 +51,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useForm } from "react-hook-form";
-import { Plus, X, CalendarDays, AlertCircle } from "lucide-react";
+import { Plus, X, CalendarDays, AlertCircle, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { API_BASE_URL } from "@/constant/Config";
@@ -61,6 +61,7 @@ interface LeaveFormData {
   leaveTypeId: string;
   startDate: string;
   endDate: string;
+  isHalfDay: boolean;
   reason: string;
   payType: "paid" | "unpaid";
 }
@@ -78,6 +79,7 @@ const LeaveManagement = () => {
       leaveTypeId: "",
       startDate: "",
       endDate: "",
+      isHalfDay: false,
       reason: "",
       payType: "paid",
     },
@@ -86,9 +88,18 @@ const LeaveManagement = () => {
   const selectedStartDate = form.watch("startDate");
   const selectedEndDate = form.watch("endDate");
   const selectedLeaveTypeId = form.watch("leaveTypeId");
+  const isHalfDay = form.watch("isHalfDay");
+
+  useEffect(() => {
+    if (isHalfDay && selectedStartDate) {
+      form.setValue("endDate", selectedStartDate);
+    }
+  }, [isHalfDay, selectedStartDate, form]);
   
-  const calculateDays = (start: string, end: string) => {
-    if (!start || !end) return 0;
+  const calculateDays = (start: string, end: string, halfDay: boolean) => {
+    if (!start) return 0;
+    if (halfDay) return 0.5;
+    if (!end) return 0;
     const s = new Date(start);
     const e = new Date(end);
     if (isNaN(s.getTime()) || isNaN(e.getTime())) return 0;
@@ -96,7 +107,7 @@ const LeaveManagement = () => {
     return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24)) + 1);
   };
 
-  const requestedDays = calculateDays(selectedStartDate, selectedEndDate);
+  const requestedDays = calculateDays(selectedStartDate, selectedEndDate, isHalfDay);
 
   const getRemainingDays = (typeId: string) => {
     const balance = employeeLeaveBalances.find(b => {
@@ -141,21 +152,23 @@ const LeaveManagement = () => {
       if (balancesRes.success) dispatch(setEmployeeLeaveBalances(balancesRes.balances));
       
       if (requestsRes.success && Array.isArray(requestsRes.leaveRequests)) {
-        const mapped: LeaveRequest[] = requestsRes.leaveRequests.map((r) => ({
-          id: r._id,
-          employeeId: r.userId,
-          employeeName: user?.name || "",
-          type: r.leaveType,
-          startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
-          endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
-          days: r.totalDays || 0,
-          reason: r.reason,
-          payType: r.payType || "paid",
-          status: r.status.charAt(0).toUpperCase() + r.status.slice(1),
-          submittedAt: r.createdAt || "",
-          approvedByName: r.approvedBy?.name || "",
-          approvedByEmail: r.approvedBy?.email || "",
-        }));
+        const mapped: LeaveRequest[] = requestsRes.leaveRequests
+          .filter((r) => r.status !== "cancelled")
+          .map((r) => ({
+            id: r._id,
+            employeeId: r.userId,
+            employeeName: user?.name || "",
+            type: r.leaveType,
+            startDate: format(new Date(r.startDate), "yyyy-MM-dd"),
+            endDate: format(new Date(r.endDate), "yyyy-MM-dd"),
+            days: r.totalDays || 0,
+            reason: r.reason,
+            payType: r.payType || "paid",
+            status: r.status.charAt(0).toUpperCase() + r.status.slice(1),
+            submittedAt: r.createdAt || "",
+            approvedByName: r.approvedBy?.name || "",
+            approvedByEmail: r.approvedBy?.email || "",
+          }));
         setLeaveRequests(mapped);
       }
     } catch (error) {
@@ -187,6 +200,8 @@ const LeaveManagement = () => {
         body: {
           startDate: data.startDate,
           endDate: data.endDate,
+          isHalfDay: data.isHalfDay,
+          totalDays: requestedDays,
           reason: data.reason,
           leaveTypeId: data.leaveTypeId,
           payType: finalPayType,
@@ -224,6 +239,7 @@ const LeaveManagement = () => {
           title: "Leave Request Cancelled",
           description: "Your leave request has been cancelled successfully.",
         });
+        setLeaveRequests(prev => prev.filter(r => r.id !== requestId));
         fetchData();
       }
     } catch (error: any) {
@@ -235,16 +251,16 @@ const LeaveManagement = () => {
     }
   };
 
-  const getStatusBadgeVariant = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case "approved":
-        return "default";
+        return <Badge className="bg-green-500/10 text-green-500 border-green-500/20 hover:bg-green-500/20">Approved</Badge>;
       case "rejected":
-        return "destructive";
+        return <Badge className="bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20">Rejected</Badge>;
       case "pending":
-        return "secondary";
+        return <Badge className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20 hover:bg-yellow-500/20">Pending</Badge>;
       default:
-        return "outline";
+        return <Badge variant="outline">{status}</Badge>;
     }
   };
 
@@ -257,11 +273,18 @@ const LeaveManagement = () => {
   };
 
   const [statusFilter, setStatusFilter] = useState<string>("All");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
 
   const filteredRequests = leaveRequests.filter((r) => {
     if (statusFilter === "All") return true;
     return r.status.toLowerCase() === statusFilter.toLowerCase();
   });
+
+  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
+  const current = Math.min(currentPage, totalPages);
+  const start = (current - 1) * pageSize;
+  const paginatedRequests = filteredRequests.slice(start, start + pageSize);
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -374,7 +397,7 @@ const LeaveManagement = () => {
                       )}
                     />
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
                       <FormField
                         control={form.control}
                         name="startDate"
@@ -402,28 +425,59 @@ const LeaveManagement = () => {
 
                       <FormField
                         control={form.control}
-                        name="endDate"
-                        rules={{ required: "End date is required" }}
+                        name="isHalfDay"
                         render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>End Date</FormLabel>
+                          <FormItem className="flex flex-row items-center space-x-3 space-y-0 h-10 mb-2">
                             <FormControl>
-                              <Input 
-                                type="date" 
-                                {...field} 
-                                onClick={(e) => {
-                                  try {
-                                    e.currentTarget.showPicker();
-                                  } catch (err) {
-                                    console.debug("showPicker not supported or failed", err);
-                                  }
-                                }}
+                              <input
+                                type="checkbox"
+                                checked={field.value}
+                                onChange={(e) => field.onChange(e.target.checked)}
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
                               />
                             </FormControl>
-                            <FormMessage />
+                            <div className="space-y-1 leading-none">
+                              <FormLabel className="text-sm font-medium cursor-pointer">
+                                Half Day Leave
+                              </FormLabel>
+                            </div>
                           </FormItem>
                         )}
                       />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="endDate"
+                      rules={{ required: !isHalfDay ? "End date is required" : false }}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>End Date</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="date" 
+                              {...field} 
+                              disabled={isHalfDay}
+                              onClick={(e) => {
+                                if (isHalfDay) return;
+                                try {
+                                  e.currentTarget.showPicker();
+                                } catch (err) {
+                                  console.debug("showPicker not supported or failed", err);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="bg-muted/30 p-3 rounded-md border border-dashed flex justify-between items-center">
+                      <span className="text-sm font-medium">Total Deduction:</span>
+                      <span className="text-sm font-bold text-primary">
+                        {requestedDays} {requestedDays === 1 ? 'Day' : 'Days'}
+                      </span>
                     </div>
 
                     <FormField
@@ -509,53 +563,57 @@ const LeaveManagement = () => {
           </div>
 
           {/* Leave Requests */}
-          <Card className="hover-lift transition-smooth border-border/50">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <CardTitle>My Leave Requests</CardTitle>
-                  <CardDescription>
-                    View your pending, approved, and rejected leave requests.
-                  </CardDescription>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-muted-foreground">Filter:</span>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-[150px] h-9">
-                      <SelectValue placeholder="All Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All Requests</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Approved">Approved</SelectItem>
-                      <SelectItem value="Rejected">Rejected</SelectItem>
-                    </SelectContent>
-                  </Select>
+          <Card className="border shadow-sm bg-card overflow-hidden">
+            <CardHeader className="pb-3 border-b flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-lg font-semibold">My Leave Requests</CardTitle>
+                <CardDescription>
+                  View your pending, approved, and rejected leave requests.
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Filter:</span>
+                <Select value={statusFilter} onValueChange={(v) => {
+                  setStatusFilter(v);
+                  setCurrentPage(1);
+                }}>
+                  <SelectTrigger className="w-[150px] h-9">
+                    <SelectValue placeholder="All Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                    <SelectItem value="Approved">Approved</SelectItem>
+                    <SelectItem value="Rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full whitespace-nowrap">
+                  {filteredRequests.length} Records
                 </div>
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {filteredRequests.length > 0 ? (
-                <div className="rounded-lg border overflow-x-auto">
+                <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="whitespace-nowrap">Type</TableHead>
-                        <TableHead className="whitespace-nowrap">Pay Type</TableHead>
-                        <TableHead className="whitespace-nowrap">Dates</TableHead>
-                        <TableHead className="whitespace-nowrap">Days</TableHead>
-                        <TableHead className="whitespace-nowrap">Status</TableHead>
-                        <TableHead className="whitespace-nowrap">Submitted</TableHead>
-                        <TableHead className="text-right whitespace-nowrap">
+                    <TableHeader className="bg-muted/50">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="font-semibold text-foreground text-center">Type</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Pay Type</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Dates</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Days</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Status</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">Submitted</TableHead>
+                        <TableHead className="font-semibold text-foreground text-center">
                           Actions
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRequests.map((request) => (
-                          <TableRow key={request.id}>
-                            <TableCell>
-                              <div className="flex items-center space-x-2">
+                      {paginatedRequests.map((request) => (
+                          <TableRow key={request.id} className="hover:bg-muted/30 transition-colors border-b last:border-0">
+                            <TableCell className="text-start">
+                              <div className="flex items-center justify-start space-x-2">
                                 <CalendarDays
                                   className={`h-4 w-4 ${getTypeColor(
                                     request.type
@@ -566,32 +624,27 @@ const LeaveManagement = () => {
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <Badge variant="outline" className="capitalize">
                                 {request.payType}
                               </Badge>
                             </TableCell>
-                            <TableCell>
-                              <div className="text-sm">
-                                <div className="truncate">
-                                  {request.startDate} -
-                                </div>
-                                <div className="text-muted-foreground truncate">
-                                  {request.endDate}
-                                </div>
+                            <TableCell className="text-center">
+                              <div className="text-sm font-medium text-foreground whitespace-nowrap">
+                                {format(new Date(request.startDate), "dd/MM/yyyy")}
+                                <span className="mx-1 text-muted-foreground">-</span>
+                                {format(new Date(request.endDate), "dd/MM/yyyy")}
                               </div>
                             </TableCell>
-                            <TableCell>
-                              <span className="font-medium text-foreground">
-                                {request.days}
+                            <TableCell className="text-center">
+                              <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
+                                {request.days} {request.days === 1 ? 'Day' : 'Days'}
                               </span>
                             </TableCell>
-                            <TableCell>
-                              <Badge variant={getStatusBadgeVariant(request.status)}>
-                                {request.status}
-                              </Badge>
+                            <TableCell className="text-center">
+                              {getStatusBadge(request.status)}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-center">
                               <span className="text-sm text-muted-foreground whitespace-nowrap">
                                 {request.submittedAt &&
                                 !isNaN(new Date(request.submittedAt).getTime())
@@ -602,8 +655,8 @@ const LeaveManagement = () => {
                                   : "N/A"}
                               </span>
                             </TableCell>
-                            <TableCell className="text-right">
-                              {request.status.toLowerCase() === "pending" && (
+                            <TableCell className="text-center">
+                              {request.status.toLowerCase() === "pending" ? (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -612,7 +665,13 @@ const LeaveManagement = () => {
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
-                              )}
+                              ) : request.status.toLowerCase() === "approved" ? (
+                                 <div className="flex justify-center">
+                                   <div className="bg-green-100 p-1.5 rounded-full" title="Approved">
+                                     <Check className="h-4 w-4 text-green-600" />
+                                   </div>
+                                 </div>
+                               ) : null}
                             </TableCell>
                           </TableRow>
                         )
@@ -621,12 +680,70 @@ const LeaveManagement = () => {
                   </Table>
                 </div>
               ) : (
-                <div className="text-center space-y-4 py-8 text-sm text-muted-foreground">
-                  <p>
-                    {statusFilter === "All" 
-                      ? "No leave requests found." 
-                      : `No ${statusFilter.toLowerCase()} leave requests found.`}
-                  </p>
+                <div className="text-center space-y-4 py-12 text-sm text-muted-foreground">
+                  <div className="flex flex-col items-center justify-center gap-2">
+                    <CalendarDays className="h-10 w-10 opacity-20" />
+                    <p>
+                      {statusFilter === "All" 
+                        ? "No leave requests found." 
+                        : `No ${statusFilter.toLowerCase()} leave requests found.`}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Pagination Controls */}
+              {filteredRequests.length > 0 && (
+                <div className="px-6 py-4 border-t flex flex-col sm:flex-row items-center justify-between gap-4 bg-card">
+                  <div className="text-sm text-muted-foreground">
+                    Showing <span className="font-semibold text-foreground">{start + 1}</span> to{" "}
+                    <span className="font-semibold text-foreground">{Math.min(start + pageSize, filteredRequests.length)}</span> of{" "}
+                    <span className="font-semibold text-foreground">{filteredRequests.length}</span> records
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={current === 1}
+                      className="h-8 px-2"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) pageNum = i + 1;
+                        else if (current <= 3) pageNum = i + 1;
+                        else if (current >= totalPages - 2) pageNum = totalPages - 4 + i;
+                        else pageNum = current - 2 + i;
+                        
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={current === pageNum ? "default" : "outline"}
+                            size="sm"
+                            className={`h-8 w-8 p-0 ${current === pageNum ? "shadow-sm" : ""}`}
+                            onClick={() => setCurrentPage(pageNum)}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={current === totalPages}
+                      className="h-8 px-2"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
               )}
             </CardContent>
