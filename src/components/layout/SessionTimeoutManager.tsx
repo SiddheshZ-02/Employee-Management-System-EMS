@@ -102,12 +102,6 @@ export const SessionTimeoutManager = () => {
     }
   };
 
-  useEffect(() => {
-    const onExpired = () => dispatch(expireSession());
-    window.addEventListener('ems:sessionExpired', onExpired as EventListener);
-    return () => window.removeEventListener('ems:sessionExpired', onExpired as EventListener);
-  }, [dispatch]);
-
   return (
     <Dialog open={sessionExpired} onOpenChange={(open) => !open && goToLogin()}>
       <DialogContent showCloseButton={false}>
