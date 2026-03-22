@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
-import { Building2, Plus, Search, Settings2, Trash2, Users, ExternalLink } from "lucide-react";
+import { Building2, Plus, Search, Settings2, Users } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/loading-skeleton";
 import {
   Pagination,

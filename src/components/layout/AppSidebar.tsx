@@ -22,9 +22,9 @@ import {
   LogOut,
   ClipboardList,
   ChevronRight,
-  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import logo from '@/assets/svg/EMS.svg';
 import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { logoutAsync } from '@/store/slices/authSlice';
 import { useNavigate } from 'react-router-dom';
@@ -200,10 +200,10 @@ export function AppSidebar() {
       collapsed ? "w-[70px]" : "w-[260px]"
     )}>
       <TooltipProvider delayDuration={0}>
-        <SidebarHeader className="h-[70px] border-b border-sidebar-border/50 px-4 flex items-center justify-center">
+        <SidebarHeader className="h-[70px]  px-4 flex items-center justify-center">
           <div className="flex items-center gap-3 w-full">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-lg shadow-primary/20 flex-shrink-0 transition-transform duration-300 hover:scale-110">
-              <span className="text-lg font-black tracking-tighter">EMS</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-transparent flex-shrink-0 transition-transform duration-300 hover:scale-110 overflow-hidden">
+              <img src={logo} alt="EMS Logo" className="h-full w-full object-contain" />
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0 overflow-hidden animate-in fade-in slide-in-from-left-4 duration-300">

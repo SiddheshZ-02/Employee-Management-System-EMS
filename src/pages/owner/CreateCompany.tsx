@@ -8,7 +8,6 @@ import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { Building2, UserCircle2, Mail, Lock, Briefcase, MapPin, ArrowLeft, Loader2, Globe } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 
 export const CreateCompany = () => {
   const { token } = useAppSelector((state) => state.auth);
