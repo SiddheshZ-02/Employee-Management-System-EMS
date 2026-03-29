@@ -22,6 +22,9 @@ import {
   LogOut,
   ClipboardList,
   ChevronRight,
+  CreditCard,
+  Ticket,
+  Settings,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logo from '@/assets/svg/EMS.svg';
@@ -114,6 +117,26 @@ const ownerNavItems = [
     title: 'Companies',
     url: '/owner/companies',
     icon: Building2,
+  },
+  {
+    title: 'Billing',
+    url: '/owner/billing',
+    icon: CreditCard,
+  },
+  {
+    title: 'Plans',
+    url: '/owner/plans',
+    icon: ClipboardList,
+  },
+  {
+    title: 'Support',
+    url: '/owner/support',
+    icon: Ticket,
+  },
+  {
+    title: 'Settings',
+    url: '/owner/settings',
+    icon: Settings,
   },
 ];
 

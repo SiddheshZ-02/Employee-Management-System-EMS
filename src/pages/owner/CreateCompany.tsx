@@ -1,268 +1,401 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { apiRequest } from "@/lib/api";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
-import { Building2, UserCircle2, Mail, Lock, Briefcase, MapPin, ArrowLeft, Loader2, Globe } from "lucide-react";
+import { 
+  Building2, 
+  UserCircle2, 
+  Mail, 
+  Lock, 
+  ArrowLeft, 
+  Loader2, 
+  Globe, 
+  Upload, 
+  Briefcase, 
+  Calendar,
+  Camera,
+  X,
+  Activity
+} from "lucide-react";
+
+const companySchema = z.object({
+  companyName: z.string().min(2, "Company name must be at least 2 characters"),
+  domain: z.string().optional().or(z.literal("")),
+  industry: z.string().optional().or(z.literal("")),
+  registrationDate: z.string().min(1, "Registration date is required"),
+  status: z.enum(["active", "deactive"]),
+  adminName: z.string().min(2, "Admin name must be at least 2 characters"),
+  adminEmail: z.string().email("Invalid email address"),
+  adminPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type CompanyFormValues = z.infer<typeof companySchema>;
 
 export const CreateCompany = () => {
-  const { token } = useAppSelector((state) => state.auth);
+  useAppSelector((state) => state.auth);
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({
-    companyName: "",
-    domain: "",
-    adminName: "",
-    adminEmail: "",
-    adminPassword: "",
-    adminDepartment: "",
-    adminPosition: "",
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    control,
+  } = useForm<CompanyFormValues>({
+    resolver: zodResolver(companySchema),
+    defaultValues: {
+      registrationDate: new Date().toISOString().split("T")[0],
+      domain: "",
+      industry: "",
+      status: "active",
+    },
   });
 
-  const handleChange = (field: keyof typeof form, value: string) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Logo must be less than 2MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setLogoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!token) {
-      toast({
-        title: "Not authenticated",
-        description: "Please log in again as owner.",
-        variant: "destructive",
-      });
-      return;
+  const removeLogo = () => {
+    setLogoPreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
+  };
 
-    if (!form.companyName || !form.adminName || !form.adminEmail || !form.adminPassword) {
-      toast({
-        title: "Missing fields",
-        description: "Company name and admin details are required.",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const onSubmit = async (data: CompanyFormValues) => {
     setSubmitting(true);
-    try {
-      await apiRequest("/api/owner/companies", {
-        method: "POST",
-        token,
-        body: {
-          name: form.companyName,
-          domain: form.domain || undefined,
-          admin: {
-            name: form.adminName,
-            email: form.adminEmail,
-            password: form.adminPassword,
-            department: form.adminDepartment || undefined,
-            position: form.adminPosition || undefined,
-          },
-        },
-      });
-
+    // UI only implementation as requested
+    console.log("Form Data:", { ...data, logo: logoPreview });
+    
+    setTimeout(() => {
       toast({
         title: "Success!",
-        description: `${form.companyName} and its administrator have been successfully registered.`,
+        description: `${data.companyName} and its administrator have been successfully registered (UI Mock).`,
       });
-      navigate("/owner/companies");
-    } catch (error) {
-      const message =
-        error instanceof Error && error.message
-          ? error.message
-          : "Failed to create company.";
-      toast({
-        title: "Registration Failed",
-        description: message,
-        variant: "destructive",
-      });
-    } finally {
       setSubmitting(false);
-    }
+      navigate("/owner/companies");
+    }, 1500);
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={() => navigate("/owner/companies")}
-          className="rounded-full"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Onboard New Enterprise</h1>
-          <p className="text-muted-foreground">Register a new company and its primary administrator.</p>
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-6">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => navigate("/owner/companies")}
+            className="rounded-full hover:bg-primary/10 transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground/90">Enterprise Onboarding</h1>
+            <p className="text-muted-foreground text-sm">Configure a new company profile and administrative control center.</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => navigate("/owner/companies")}
+            disabled={submitting}
+            className="hidden md:flex"
+          >
+            Cancel
+          </Button>
+          <Button 
+            form="onboarding-form"
+            type="submit" 
+            disabled={submitting} 
+            className="min-w-[140px] shadow-lg shadow-primary/20"
+          >
+            {submitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              "Complete Onboarding"
+            )}
+          </Button>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid gap-6">
-          <Card className="border-none shadow-sm overflow-hidden">
-            <div className="h-2 bg-primary/80" />
-            <CardHeader>
-              <div className="flex items-center gap-2 mb-1 text-primary">
-                <Building2 className="h-5 w-5" />
-                <span className="text-sm font-bold uppercase tracking-wider">Company Information</span>
-              </div>
-              <CardTitle className="text-xl">Organization Details</CardTitle>
-              <CardDescription>Basic information about the enterprise you are onboarding.</CardDescription>
+      <form id="onboarding-form" onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column: Branding & Core Details (4 cols) */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* Logo & Status Section */}
+          <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm overflow-hidden border-l-4 border-primary/60">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Identity & Status
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="companyName" className="text-sm font-medium">Company Name</Label>
-                  <div className="relative">
-                    <Building2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <CardContent className="space-y-6">
+              {/* Logo Upload - More Compact & Integrated */}
+              <div className="flex flex-col items-center justify-center py-4 bg-muted/30 rounded-xl border-2 border-dashed border-muted-foreground/20 hover:border-primary/40 transition-all group relative">
+                <div className="w-24 h-24 rounded-full bg-background flex items-center justify-center overflow-hidden border-2 border-muted-foreground/10 group-hover:scale-105 transition-transform duration-300">
+                  {logoPreview ? (
+                    <img src={logoPreview} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <Camera className="h-8 w-8 text-muted-foreground/40" />
+                  )}
+                </div>
+                
+                <div className="mt-4 text-center">
+                  <p className="text-xs font-semibold text-foreground/70 mb-1 uppercase tracking-wider">Company Logo</p>
+                  <p className="text-[10px] text-muted-foreground mb-3 italic">(PNG, JPG, SVG - Max 2MB)</p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="h-7 text-[10px] px-3 font-bold"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-3 w-3 mr-1" />
+                      CHANGE
+                    </Button>
+                    {logoPreview && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-[10px] px-3 font-bold text-destructive hover:bg-destructive/10"
+                        onClick={removeLogo}
+                      >
+                        <X className="h-3 w-3 mr-1" />
+                        REMOVE
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <input type="file" ref={fileInputRef} onChange={handleLogoChange} accept="image/*" className="hidden" />
+              </div>
+
+              {/* Status Selector */}
+              <div className="space-y-2 pt-2">
+                <Label htmlFor="status" className="text-xs font-bold uppercase text-muted-foreground tracking-widest">Operation Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <SelectTrigger className="w-full h-10 border-muted-foreground/20 focus:ring-primary/20">
+                        <div className="flex items-center gap-2">
+                          <Activity className={`h-4 w-4 ${field.value === 'active' ? 'text-green-500' : 'text-amber-500'}`} />
+                          <SelectValue placeholder="Select Status" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active" className="text-green-600 font-medium">Active (Operational)</SelectItem>
+                        <SelectItem value="deactive" className="text-amber-600 font-medium">Deactive (Suspended)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats Card (Visual Polish) */}
+          <Card className="border-none shadow-md bg-primary/5 text-primary-foreground/90 overflow-hidden relative group">
+            <div className="absolute top-0 right-0 p-4 opacity-10">
+              <Building2 className="h-20 w-20" />
+            </div>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest text-primary/80">Onboarding Preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Company Name:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[120px]">
+                    {register("companyName").name ? "Pending Input" : "N/A"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-muted-foreground">Admin Access:</span>
+                  <span className="font-semibold text-foreground truncate max-w-[120px]">
+                    {register("adminName").name ? "Required" : "N/A"}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Detailed Configuration (8 cols) */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Organization Configuration */}
+          <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm border-l-4 border-primary/40">
+            <CardHeader>
+              <div className="flex items-center gap-2 text-primary/80 mb-1">
+                <Globe className="h-4 w-4" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Configuration Phase 01</span>
+              </div>
+              <CardTitle className="text-xl font-bold">Organization Architecture</CardTitle>
+              <CardDescription className="text-xs">Define the primary operational parameters for the enterprise.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="companyName" className="text-xs font-semibold text-foreground/80">Legal Entity Name</Label>
+                  <div className="relative group">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       id="companyName"
-                      className="pl-9"
-                      value={form.companyName}
-                      onChange={(e) => handleChange("companyName", e.target.value)}
-                      placeholder="Acme International"
-                      required
+                      className={`pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20 ${errors.companyName ? "border-destructive ring-destructive/20" : ""}`}
+                      placeholder="e.g. Acme International Ltd."
+                      {...register("companyName")}
+                    />
+                  </div>
+                  {errors.companyName && <p className="text-[10px] font-medium text-destructive mt-1 flex items-center gap-1"><X className="h-3 w-3" /> {errors.companyName.message}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="domain" className="text-xs font-semibold text-foreground/80">Corporate Domain</Label>
+                  <div className="relative group">
+                    <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="domain"
+                      className="pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20"
+                      placeholder="acme-intl.com"
+                      {...register("domain")}
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="domain" className="text-sm font-medium">Official Domain (Optional)</Label>
-                  <div className="relative">
-                    <Globe className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="industry" className="text-xs font-semibold text-foreground/80">Market Industry</Label>
+                  <div className="relative group">
+                    <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                      id="domain"
-                      className="pl-9"
-                      value={form.domain}
-                      onChange={(e) => handleChange("domain", e.target.value)}
-                      placeholder="acme-intl.com"
+                      id="industry"
+                      className="pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20"
+                      placeholder="e.g. Technology, Fintech, Logistics"
+                      {...register("industry")}
                     />
                   </div>
-                  <p className="text-[10px] text-muted-foreground ml-1 italic">Example: company.com</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="registrationDate" className="text-xs font-semibold text-foreground/80">Commencement Date</Label>
+                  <div className="relative group">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="registrationDate"
+                      type="date"
+                      className={`pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20 ${errors.registrationDate ? "border-destructive ring-destructive/20" : ""}`}
+                      {...register("registrationDate")}
+                    />
+                  </div>
+                  {errors.registrationDate && <p className="text-[10px] font-medium text-destructive mt-1 flex items-center gap-1"><X className="h-3 w-3" /> {errors.registrationDate.message}</p>}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm overflow-hidden">
-            <div className="h-2 bg-primary/60" />
+          {/* Administrative Control */}
+          <Card className="border-none shadow-md bg-card/50 backdrop-blur-sm border-l-4 border-primary/40">
             <CardHeader>
-              <div className="flex items-center gap-2 mb-1 text-primary">
-                <UserCircle2 className="h-5 w-5" />
-                <span className="text-sm font-bold uppercase tracking-wider">Administrator Setup</span>
+              <div className="flex items-center gap-2 text-primary/80 mb-1">
+                <UserCircle2 className="h-4 w-4" />
+                <span className="text-[10px] font-bold uppercase tracking-widest">Configuration Phase 02</span>
               </div>
-              <CardTitle className="text-xl">Primary Admin Account</CardTitle>
-              <CardDescription>This user will have full administrative access to the company dashboard.</CardDescription>
+              <CardTitle className="text-xl font-bold">Administrative Oversight</CardTitle>
+              <CardDescription className="text-xs">Establish the primary root account for the enterprise management system.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="adminName" className="text-sm font-medium">Full Name</Label>
-                  <div className="relative">
-                    <UserCircle2 className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <CardContent className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <Label htmlFor="adminName" className="text-xs font-semibold text-foreground/80">Primary Admin Name</Label>
+                  <div className="relative group">
+                    <UserCircle2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       id="adminName"
-                      className="pl-9"
-                      value={form.adminName}
-                      onChange={(e) => handleChange("adminName", e.target.value)}
-                      placeholder="John Doe"
-                      required
+                      className={`pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20 ${errors.adminName ? "border-destructive ring-destructive/20" : ""}`}
+                      placeholder="Full legal name"
+                      {...register("adminName")}
                     />
                   </div>
+                  {errors.adminName && <p className="text-[10px] font-medium text-destructive mt-1 flex items-center gap-1"><X className="h-3 w-3" /> {errors.adminName.message}</p>}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adminEmail" className="text-sm font-medium">Email Address</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="adminEmail" className="text-xs font-semibold text-foreground/80">Corporate Email</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       id="adminEmail"
                       type="email"
-                      className="pl-9"
-                      value={form.adminEmail}
-                      onChange={(e) => handleChange("adminEmail", e.target.value)}
-                      placeholder="john.doe@acme.com"
-                      required
+                      className={`pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20 ${errors.adminEmail ? "border-destructive ring-destructive/20" : ""}`}
+                      placeholder="admin@enterprise.com"
+                      {...register("adminEmail")}
                     />
                   </div>
+                  {errors.adminEmail && <p className="text-[10px] font-medium text-destructive mt-1 flex items-center gap-1"><X className="h-3 w-3" /> {errors.adminEmail.message}</p>}
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="adminPassword" className="text-sm font-medium">Initial Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="adminPassword"
-                      type="password"
-                      className="pl-9"
-                      value={form.adminPassword}
-                      onChange={(e) => handleChange("adminPassword", e.target.value)}
-                      placeholder="••••••••"
-                      required
-                      minLength={6}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground ml-1">Must be at least 6 characters.</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adminDepartment" className="text-sm font-medium">Department (Optional)</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="adminDepartment"
-                      className="pl-9"
-                      value={form.adminDepartment}
-                      onChange={(e) =>
-                        handleChange("adminDepartment", e.target.value)
-                      }
-                      placeholder="Operations / HR"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="adminPosition" className="text-sm font-medium">Job Title / Position (Optional)</Label>
-                <div className="relative">
-                  <Briefcase className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <div className="space-y-1.5">
+                <Label htmlFor="adminPassword" className="text-xs font-semibold text-foreground/80">System Access Password</Label>
+                <div className="relative group">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
-                    id="adminPosition"
-                    className="pl-9"
-                    value={form.adminPosition}
-                    onChange={(e) =>
-                      handleChange("adminPosition", e.target.value)
-                    }
-                    placeholder="Chief Operating Officer"
+                    id="adminPassword"
+                    type="password"
+                    className={`pl-10 h-11 bg-background/50 border-muted-foreground/20 focus-visible:ring-primary/20 ${errors.adminPassword ? "border-destructive ring-destructive/20" : ""}`}
+                    placeholder="••••••••••••"
+                    {...register("adminPassword")}
                   />
                 </div>
+                {errors.adminPassword ? (
+                  <p className="text-[10px] font-medium text-destructive mt-1 flex items-center gap-1"><X className="h-3 w-3" /> {errors.adminPassword.message}</p>
+                ) : (
+                  <p className="text-[10px] text-muted-foreground italic mt-1 ml-1">Must contain at least 6 characters for enterprise security.</p>
+                )}
               </div>
             </CardContent>
-            <CardFooter className="bg-muted/30 border-t flex justify-end gap-3 py-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => navigate("/owner/companies")}
-                disabled={submitting}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={submitting} className="min-w-[140px]">
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  "Create Company"
-                )}
+            <CardFooter className="bg-muted/30 border-t flex justify-end gap-3 py-4 md:hidden">
+              <Button type="submit" disabled={submitting} className="w-full h-11">
+                {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Complete Onboarding"}
               </Button>
             </CardFooter>
           </Card>

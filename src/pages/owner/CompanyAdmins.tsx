@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { apiRequest } from "@/lib/api";
-import { toast } from "@/hooks/use-toast";
 import { UserCheck, UserX, Mail, ShieldCheck, Briefcase, ArrowLeft, Search, Building2, MoreHorizontal, UserCog } from "lucide-react";
 import { TableSkeleton } from "@/components/ui/loading-skeleton";
 import {
@@ -43,18 +41,26 @@ interface AdminUser {
   isActive?: boolean;
 }
 
-interface CompanyAdminsResponse {
-  success: boolean;
-  data: {
-    company: Company;
-    admins: AdminUser[];
-  };
-}
-
 const ITEMS_PER_PAGE = 5;
 
+const MOCK_ADMINS: Record<string, { company: Company; admins: AdminUser[] }> = {
+  "1": {
+    company: { _id: "1", name: "Acme International", domain: "acme-intl.com" },
+    admins: [
+      { _id: "a1", name: "John Doe", email: "john@acme.com", role: "admin", department: "IT", isActive: true },
+      { _id: "a2", name: "Jane Smith", email: "jane@acme.com", role: "admin", department: "Operations", isActive: true },
+    ]
+  },
+  "2": {
+    company: { _id: "2", name: "Globex Corp", domain: "globex.io" },
+    admins: [
+      { _id: "a3", name: "Hank Scorpio", email: "hank@globex.io", role: "admin", department: "Management", isActive: true },
+    ]
+  }
+};
+
 export const CompanyAdmins = () => {
-  const { token } = useAppSelector((state) => state.auth);
+  useAppSelector((state) => state.auth);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [company, setCompany] = useState<Company | null>(null);
@@ -64,37 +70,22 @@ export const CompanyAdmins = () => {
   const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
-    const loadAdmins = async () => {
-      if (!token || !id) return;
-      setLoading(true);
-      try {
-        const response = await apiRequest<CompanyAdminsResponse>(
-          `/api/owner/companies/${id}/admins`,
-          { token }
-        );
-        if (response.success) {
-          setCompany(response.data.company);
-          setAdmins(response.data.admins || []);
-        } else {
-          toast({
-            title: "Failed to load admins",
-            description: "Unexpected response from server.",
-            variant: "destructive",
-          });
-        }
-      } catch {
-        toast({
-          title: "Failed to load admins",
-          description: "An error occurred while fetching admins.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
+    setLoading(true);
+    const timer = setTimeout(() => {
+      if (id && MOCK_ADMINS[id]) {
+        setCompany(MOCK_ADMINS[id].company);
+        setAdmins(MOCK_ADMINS[id].admins);
+      } else {
+        // Fallback for demo
+        setCompany({ _id: id || "unknown", name: "Demo Company", domain: "demo.com" });
+        setAdmins([
+          { _id: "d1", name: "Demo Admin", email: "admin@demo.com", role: "admin", department: "General", isActive: true }
+        ]);
       }
-    };
-
-    loadAdmins();
-  }, [token, id]);
+      setLoading(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [id]);
 
   const filteredAdmins = useMemo(() => {
     return admins.filter((admin) =>
