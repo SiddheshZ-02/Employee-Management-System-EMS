@@ -5,9 +5,12 @@ import {
   type LeaveRequest, 
   type LeaveType, 
   type EmployeeLeaveBalance,
+  type LeaveCard,
   setLeaveTypes,
-  setEmployeeLeaveBalances
+  setEmployeeLeaveBalances,
+  setLeaveCards
 } from "@/store/slices/leaveSlice";
+
 import {
   Card,
   CardContent,
@@ -68,7 +71,7 @@ interface LeaveFormData {
 const LeaveManagement = () => {
   const dispatch = useAppDispatch();
   const { user, token } = useAppSelector((state) => state.auth);
-  const { leaveTypes, employeeLeaveBalances } = useAppSelector((state) => state.leave);
+  const { leaveTypes, employeeLeaveBalances, leaveCards } = useAppSelector((state) => state.leave);
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
@@ -113,7 +116,13 @@ const LeaveManagement = () => {
       const bTypeId = b.leaveTypeId?._id || b.leaveTypeId?.id || b.leaveTypeId;
       return bTypeId === typeId;
     });
-    return balance ? balance.remainingDays : 0;
+    
+    const card = leaveCards.find(c => c.leave_type_id === typeId);
+    
+    const yearlyRemaining = balance ? balance.remainingDays : 0;
+    const allocationRemaining = card ? card.available_days : 0;
+    
+    return yearlyRemaining + allocationRemaining;
   };
 
   // Automatically suggest payment type based on balance
@@ -137,14 +146,22 @@ const LeaveManagement = () => {
     try {
       if (!token) return;
 
-      const [typesRes, balancesRes, requestsRes] = await Promise.all([
+      const today = new Date();
+      const currentMonth = today.getMonth();
+      const currentYear = today.getFullYear();
+      const financialYearStart = currentMonth < 3 ? currentYear - 1 : currentYear;
+      const grantYear = `${financialYearStart}-${financialYearStart + 1}`;
+
+      const [typesRes, balancesRes, requestsRes, cardsRes] = await Promise.all([
         apiRequest<{ success: boolean; leaveTypes: LeaveType[] }>("/api/leave/types", { token }),
-        apiRequest<{ success: boolean; balances: EmployeeLeaveBalance[] }>("/api/leave/balances", { token }),
-        apiRequest<{ success: boolean; leaveRequests: any[] }>("/api/leave/my-requests", { token })
+        apiRequest<{ success: boolean; balances: EmployeeLeaveBalance[] }>(`/api/leave/balances?year=${grantYear}`, { token }),
+        apiRequest<{ success: boolean; leaveRequests: any[] }>("/api/leave/my-requests", { token }),
+        apiRequest<{ success: boolean; leaveCards: LeaveCard[] }>("/api/leave/leave-cards-status", { token })
       ]);
 
       if (typesRes.success) dispatch(setLeaveTypes(typesRes.leaveTypes));
       if (balancesRes.success) dispatch(setEmployeeLeaveBalances(balancesRes.balances));
+      if (cardsRes.success) dispatch(setLeaveCards(cardsRes.leaveCards));
       
       if (requestsRes.success && Array.isArray(requestsRes.leaveRequests)) {
         const mapped: LeaveRequest[] = requestsRes.leaveRequests
@@ -173,6 +190,37 @@ const LeaveManagement = () => {
 
   useEffect(() => {
     fetchData();
+    
+    const interval = setInterval(() => {
+      fetchData();
+    }, 24 * 60 * 60 * 1000);
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'ems_leave_updated') {
+        fetchData();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchData]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchData]);
 
   const onSubmit = async (data: LeaveFormData) => {
@@ -280,6 +328,103 @@ const LeaveManagement = () => {
   const current = Math.min(currentPage, totalPages);
   const start = (current - 1) * pageSize;
   const paginatedRequests = filteredRequests.slice(start, start + pageSize);
+
+  // Merge yearly balances with granted leaves
+  const unifiedLeaveData = useCallback(() => {
+    const map = new Map<string, {
+      leaveTypeId: string;
+      leaveTypeName: string;
+      yearlyRemaining: number;
+      yearlyAllocated: number;
+      yearlyUsed: number;
+      grantedRemaining: number;
+      grantedTotal: number;
+      grantedUsed: number;
+      earliestExpiryDays: number | null;
+      earliestExpiryDate: string | null;
+      hasGrantedLeaves: boolean;
+    }>();
+
+    // Add ONLY yearly balances (filter out allocation-based ones)
+    employeeLeaveBalances.forEach(balance => {
+      // Skip allocation-based balances - they're handled separately via leaveCards
+      if ((balance as any).isAllocationBased) {
+        return;
+      }
+
+      const typeId = String(balance.leaveTypeId?._id || balance.leaveTypeId?.id || balance.leaveTypeId);
+      map.set(typeId, {
+        leaveTypeId: typeId,
+        leaveTypeName: balance.leaveTypeId?.name || 'Leave',
+        yearlyRemaining: balance.remainingDays,
+        yearlyAllocated: balance.allocatedDays,
+        yearlyUsed: balance.usedDays,
+        grantedRemaining: 0,
+        grantedTotal: 0,
+        grantedUsed: 0,
+        earliestExpiryDays: null,
+        earliestExpiryDate: null,
+        hasGrantedLeaves: false,
+      });
+    });
+
+    // Merge granted leaves from leaveCards (which comes from LeaveAllocation)
+    leaveCards.forEach(card => {
+      const typeId = String(card.leave_type_id);
+      const existing = map.get(typeId);
+
+      if (existing) {
+        existing.grantedRemaining = card.available_days;
+        existing.grantedTotal = card.total_days;
+        existing.grantedUsed = card.used_days;
+        existing.earliestExpiryDays = card.expires_in_days;
+        existing.earliestExpiryDate = card.expiry_date;
+        existing.hasGrantedLeaves = true;
+      } else {
+        map.set(typeId, {
+          leaveTypeId: typeId,
+          leaveTypeName: card.leave_type_name,
+          yearlyRemaining: 0,
+          yearlyAllocated: 0,
+          yearlyUsed: 0,
+          grantedRemaining: card.available_days,
+          grantedTotal: card.total_days,
+          grantedUsed: card.used_days,
+          earliestExpiryDays: card.expires_in_days,
+          earliestExpiryDate: card.expiry_date,
+          hasGrantedLeaves: true,
+        });
+      }
+    });
+
+    return Array.from(map.values());
+  }, [employeeLeaveBalances, leaveCards]);
+
+  const unifiedLeaves = unifiedLeaveData();
+
+  // Calculate display values - show granted leaves SEPARATELY from yearly
+  const getDisplayDays = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
+    // If granted leaves exist, show ONLY granted (not combined)
+    if (item.hasGrantedLeaves && item.grantedTotal > 0) {
+      return item.grantedRemaining;
+    }
+    // Otherwise show yearly balance
+    return item.yearlyRemaining;
+  };
+
+  const getDisplayAllocated = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
+    if (item.hasGrantedLeaves && item.grantedTotal > 0) {
+      return item.grantedTotal;
+    }
+    return item.yearlyAllocated;
+  };
+
+  const getDisplayUsed = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
+    if (item.hasGrantedLeaves && item.grantedUsed > 0) {
+      return item.grantedUsed;
+    }
+    return item.yearlyUsed;
+  };
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -452,7 +597,7 @@ const LeaveManagement = () => {
                           <FormControl>
                             <Input 
                               type="date" 
-                              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-calendar-picker-indicator]:hidden"
+                              className="w-full bg-background border border-border rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed [&::-webkit-calendar-pcker-indicator]:hidden"
                               {...field} 
                               disabled={isHalfDay}
                               onClick={(e) => {
@@ -515,46 +660,162 @@ const LeaveManagement = () => {
             </Dialog>
           </div>
 
-          {/* Leave Balance Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {employeeLeaveBalances.map((balance) => (
-              <Card
-                key={balance._id || balance.id}
-                className="hover-lift transition-smooth border-border/50"
-              >
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground capitalize truncate">
-                    {balance.leaveTypeId?.name || "Leave"}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <div className="text-2xl font-bold text-foreground">
-                        {balance.remainingDays}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate">
-                        of {balance.allocatedDays} days
-                      </div>
-                    </div>
-                    <CalendarDays
-                      className={`h-5 w-5 ${getTypeColor(balance.leaveTypeId?.name || "")} shrink-0`}
-                    />
-                  </div>
-                  <div className="mt-3 w-full bg-secondary rounded-full h-2">
-                    <div
-                      className="bg-primary h-2 rounded-full transition-all duration-300"
-                      style={{
-                        width: `${(balance.remainingDays / balance.allocatedDays) * 100}%`,
-                      }}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            {employeeLeaveBalances.length === 0 && (
-              <div className="col-span-full py-8 text-center border-2 border-dashed rounded-lg text-muted-foreground">
-                No leave balances allocated for the current year.
+          {/* Unified Leave Balance Cards */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              <h3 className="text-xl font-bold">Leave Balances</h3>
+              {unifiedLeaves.length > 0 && (
+                <Badge variant="outline" className="text-muted-foreground border-dashed text-xs">
+                  {unifiedLeaves.length} {unifiedLeaves.length === 1 ? 'type' : 'types'}
+                </Badge>
+              )}
+            </div>
+
+            {unifiedLeaves.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {unifiedLeaves.map((item) => {
+                  const totalRemaining = getDisplayDays(item);
+                  const totalAllocated = getDisplayAllocated(item);
+                  const totalUsed = getDisplayUsed(item);
+                  const percentage = totalAllocated > 0 ? (totalRemaining / totalAllocated) * 100 : 0;
+                  const hasExpiryWarning = item.hasGrantedLeaves && item.earliestExpiryDays !== null;
+                  const urgencyLevel = hasExpiryWarning 
+                    ? (item.earliestExpiryDays! <= 7 ? 'critical' : item.earliestExpiryDays! <= 15 ? 'warning' : 'safe')
+                    : 'none';
+                  
+                  return (
+                    <Card
+                      key={item.leaveTypeId}
+                      className="hover-lift transition-smooth border-border/50 relative overflow-hidden hover:shadow-md group"
+                    >
+                      {/* Top accent bar for expiry warning */}
+                      {hasExpiryWarning && (
+                        <div className={`absolute top-0 left-0 right-0 h-1 ${
+                          urgencyLevel === 'critical' ? 'bg-red-500' : 
+                          urgencyLevel === 'warning' ? 'bg-amber-500' : 
+                          'bg-blue-500'
+                        }`} />
+                      )}
+
+                      <CardContent className="p-4 pt-5">
+                        {/* Header with expiry badge */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className={`p-2 rounded-lg transition-colors shrink-0 ${
+                              urgencyLevel === 'critical' ? 'bg-red-500/10' : 
+                              urgencyLevel === 'warning' ? 'bg-amber-500/10' : 
+                              'bg-primary/10'
+                            }`}>
+                              <CalendarDays className={`h-4 w-4 ${
+                                urgencyLevel === 'critical' ? 'text-red-500' : 
+                                urgencyLevel === 'warning' ? 'text-amber-500' : 
+                                'text-primary'
+                              }`} />
+                            </div>
+                            <div className="min-w-0">
+                              <h3 className="font-semibold text-sm leading-tight truncate">
+                                {item.leaveTypeName}
+                              </h3>
+                            </div>
+                          </div>
+
+                          {/* Expiry badge */}
+                          {hasExpiryWarning && (
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] font-semibold px-1.5 py-0 shrink-0 border ${
+                                urgencyLevel === 'critical' 
+                                  ? 'bg-red-500/15 text-red-600 border-red-300 animate-pulse' 
+                                  : urgencyLevel === 'warning' 
+                                  ? 'bg-amber-500/15 text-amber-600 border-amber-300' 
+                                  : 'bg-blue-500/15 text-blue-600 border-blue-300'
+                              }`}
+                            >
+                              {item.earliestExpiryDays}d left
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Big count */}
+                        <div className="flex items-baseline gap-1 mb-2">
+                          <span className={`text-2xl font-bold leading-none ${
+                            urgencyLevel === 'critical' ? 'text-red-500' : 
+                            urgencyLevel === 'warning' ? 'text-amber-500' : 
+                            'text-primary'
+                          }`}>
+                            {totalRemaining}
+                          </span>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            / {totalAllocated} Days
+                          </span>
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="w-full bg-muted rounded-full h-1.5 mb-2 overflow-hidden">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-500 ${
+                              urgencyLevel === 'critical' ? 'bg-red-500' : 
+                              urgencyLevel === 'warning' ? 'bg-amber-500' : 
+                              'bg-primary'
+                            }`}
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+
+                        {/* Compact stats row */}
+                        <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-2">
+                          <div className="flex items-center gap-1">
+                            <span>Used: <span className="font-semibold text-foreground">{totalUsed}</span></span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span>Avail: <span className="font-semibold text-foreground">{totalRemaining}</span></span>
+                          </div>
+                        </div>
+
+                        {/* Expiry footer - compact */}
+                        {hasExpiryWarning && item.grantedRemaining > 0 && (
+                          <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded ${
+                            urgencyLevel === 'critical' 
+                              ? 'bg-red-50 text-red-600 dark:bg-red-900/20' 
+                              : urgencyLevel === 'warning' 
+                              ? 'bg-amber-50 text-amber-600 dark:bg-amber-900/20' 
+                              : 'bg-muted/50 text-muted-foreground'
+                          }`}>
+                            <AlertCircle className="h-3 w-3 shrink-0" />
+                            <span className="truncate">
+                              {item.grantedRemaining} granted days expire in {item.earliestExpiryDays}d
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Breakdown - ultra compact */}
+                        {(item.yearlyAllocated > 0 || item.hasGrantedLeaves) && (
+                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1">
+                            {item.yearlyAllocated > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-muted/50">
+                                Y: {item.yearlyRemaining}
+                              </span>
+                            )}
+                            {item.hasGrantedLeaves && item.grantedTotal > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                                G: {item.grantedRemaining}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-10 border-2 border-dashed rounded-xl text-muted-foreground bg-muted/20 gap-3">
+                <CalendarDays className="h-10 w-10 opacity-20" />
+                <div className="text-center">
+                  <p className="text-sm font-medium">No leave balances yet</p>
+                  <p className="text-xs mt-1 opacity-70">Your allocated leaves will appear here.</p>
+                </div>
               </div>
             )}
           </div>

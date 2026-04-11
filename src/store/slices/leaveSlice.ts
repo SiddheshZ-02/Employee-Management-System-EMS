@@ -50,11 +50,22 @@ export interface EmployeeLeaveBalance {
   status: 'active' | 'expired';
 }
 
+export interface LeaveCard {
+  leave_type_id: string;
+  leave_type_name: string;
+  available_days: number;
+  total_days: number;
+  used_days: number;
+  expires_in_days: number;
+  expiry_date: string;
+}
+
 interface LeaveState {
   requests: LeaveRequest[];
   balances: LeaveBalances;
   leaveTypes: LeaveType[];
   employeeLeaveBalances: EmployeeLeaveBalance[];
+  leaveCards: LeaveCard[];
   loading: boolean;
   error: string | null;
 }
@@ -69,6 +80,7 @@ const initialState: LeaveState = {
   },
   leaveTypes: [],
   employeeLeaveBalances: [],
+  leaveCards: [],
   loading: false,
   error: null,
 };
@@ -88,6 +100,9 @@ const leaveSlice = createSlice({
     },
     setEmployeeLeaveBalances: (state, action: PayloadAction<EmployeeLeaveBalance[]>) => {
       state.employeeLeaveBalances = action.payload;
+    },
+    setLeaveCards: (state, action: PayloadAction<LeaveCard[]>) => {
+      state.leaveCards = action.payload;
     },
     addLeaveType: (state, action: PayloadAction<LeaveType>) => {
       state.leaveTypes.push(action.payload);
@@ -128,6 +143,7 @@ export const {
   setError,
   setLeaveTypes,
   setEmployeeLeaveBalances,
+  setLeaveCards,
   addLeaveType,
   updateLeaveType,
   removeLeaveType,

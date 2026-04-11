@@ -10,7 +10,7 @@ import SessionTimeoutManager from "@/components/layout/SessionTimeoutManager";
 
 const AuthPage = lazy(() =>
   import("@/pages/Auth").then((m) => ({ default: m.Auth }))
-);  
+);
 const DashboardLayoutLazy = lazy(() =>
   import("@/components/layout/DashboardLayout").then((m) => ({
     default: m.DashboardLayout,
@@ -131,11 +131,11 @@ const EmployeeDashboardLazy = lazy(() =>
     default: m.EmployeeDashboard,
   }))
 );
-const AttendanceTrackingLazy = lazy(() =>
-  import("@/pages/employee/AttendanceTracking")
+const AttendanceTrackingLazy = lazy(
+  () => import("@/pages/employee/AttendanceTracking")
 );
-const LeaveManagementLazy = lazy(() =>
-  import("@/pages/employee/LeaveManagement")
+const LeaveManagementLazy = lazy(
+  () => import("@/pages/employee/LeaveManagement")
 );
 const ProfileManagementLazy = lazy(() =>
   import("@/pages/employee/ProfileManagement").then((m) => ({
@@ -213,14 +213,17 @@ const App = () => (
                     element={<EmployeeAttendanceDetailsLazy />}
                   />
                   <Route
-                  path="office-location"
-                  element={<OfficeLocationPageLazy />}
-                />
-                <Route path="access" element={<AdminAccessLazy />} />
-                <Route path="holidays" element={<CompanyHolidaysLazy />} />
-                <Route path="weekoff" element={<CompanyWeekOffLazy />} />
-                <Route path="leave-allocation" element={<LeaveAllocationLazy />} />
-              </Route>
+                    path="office-location"
+                    element={<OfficeLocationPageLazy />}
+                  />
+                  <Route path="access" element={<AdminAccessLazy />} />
+                  <Route path="holidays" element={<CompanyHolidaysLazy />} />
+                  <Route path="weekoff" element={<CompanyWeekOffLazy />} />
+                  <Route
+                    path="leave-allocation"
+                    element={<LeaveAllocationLazy />}
+                  />
+                </Route>
 
                 <Route
                   path="/owner"
@@ -231,10 +234,7 @@ const App = () => (
                   }
                 >
                   <Route path="dashboard" element={<OwnerDashboardLazy />} />
-                  <Route
-                    path="companies"
-                    element={<OwnerCompanyListLazy />}
-                  />
+                  <Route path="companies" element={<OwnerCompanyListLazy />} />
                   <Route
                     path="companies/:id"
                     element={<OwnerCompanyDetailsLazy />}
@@ -261,31 +261,22 @@ const App = () => (
                     </ProtectedRouteLazy>
                   }
                 >
-                  <Route
-                    path="dashboard"
-                    element={<EmployeeDashboardLazy />}
-                  />
+                  <Route path="dashboard" element={<EmployeeDashboardLazy />} />
                   <Route
                     path="attendance"
                     element={<AttendanceTrackingLazy />}
                   />
                   <Route path="leave" element={<LeaveManagementLazy />} />
-                  <Route
-                    path="holidays"
-                    element={<EmployeeHolidaysLazy />}
-                  />
-                  <Route
-                    path="profile"
-                    element={<ProfileManagementLazy />}
-                  />
+                  <Route path="holidays" element={<EmployeeHolidaysLazy />} />
+                  <Route path="profile" element={<ProfileManagementLazy />} />
                 </Route>
 
                 <Route path="*" element={<NotFoundLazy />} />
               </Routes>
             </Suspense>
           </HashRouter>
-      </TooltipProvider>
-    </ThemeProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   </Provider>
 );

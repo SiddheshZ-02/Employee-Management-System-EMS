@@ -24,6 +24,7 @@ import {
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 import { Badge } from "@/components/ui/badge";
+import EmployeeLeaveCard from "./components/EmployeeLeaveCard";
 import {
   format,
   parseISO,
@@ -106,6 +107,7 @@ export const EmployeeDashboard = () => {
 
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
+  const [leaveCards, setLeaveCards] = useState<any[]>([]);
   const [holidays, setHolidaysState] = useState<any[]>([]);
 
   useEffect(() => {
@@ -144,6 +146,9 @@ export const EmployeeDashboard = () => {
           fetch(`${API_BASE_URL}/api/auth/birthdays`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch(`${API_BASE_URL}/api/leave/leave-cards-status`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         const [
@@ -155,7 +160,41 @@ export const EmployeeDashboard = () => {
           holidayRes,
           colleaguesRes,
           birthdaysRes,
-        ] = responses.map(r => r.status === 'fulfilled' ? r.value : { ok: false, json: () => Promise.resolve({}) } as any);
+          leaveCardsRes,
+        ] = responses.map((r) =>
+          r.status === "fulfilled"
+            ? r.value
+            : ({ ok: false, json: () => Promise.resolve({}) } as any),
+        );
+
+        if (leaveCardsRes.ok) {
+          const leaveCardsJson = await leaveCardsRes.json();
+          if (leaveCardsJson.success) {
+            const cards = leaveCardsJson.leaveCards || [];
+            setLeaveCards(cards);
+            
+            if (balanceRes.ok) {
+              const balanceJson = await balanceRes.json();
+              if (balanceJson.success && Array.isArray(balanceJson.balances)) {
+                const yearlyBalances = balanceJson.balances.filter(
+                  (b: any) => !b.isAllocationBased
+                );
+                
+                const yearlyTotal = yearlyBalances.reduce(
+                  (sum: number, b: any) => sum + (b.remainingDays || 0),
+                  0,
+                );
+                
+                const grantedTotal = cards.reduce(
+                  (sum: number, card: any) => sum + (card.available_days || 0),
+                  0,
+                );
+                
+                setLeaveBalance(yearlyTotal + grantedTotal);
+              }
+            }
+          }
+        }
 
         if (colleaguesRes.ok) {
           const colleaguesJson = await colleaguesRes.json();
@@ -176,7 +215,7 @@ export const EmployeeDashboard = () => {
                   : new Date().toISOString(),
                 status: emp.isActive === false ? "Inactive" : "Active",
                 dateOfBirth: emp.dateOfBirth,
-              })
+              }),
             );
             dispatch(setEmployees(mappedEmployees));
           }
@@ -184,10 +223,7 @@ export const EmployeeDashboard = () => {
 
         if (birthdaysRes.ok) {
           const birthdaysJson = await birthdaysRes.json();
-          if (
-            birthdaysJson.success &&
-            Array.isArray(birthdaysJson.birthdays)
-          ) {
+          if (birthdaysJson.success && Array.isArray(birthdaysJson.birthdays)) {
             setUpcomingBirthdays(birthdaysJson.birthdays);
           }
         }
@@ -237,25 +273,29 @@ export const EmployeeDashboard = () => {
           }
         }
 
-        // Now calculate weekly data with all available information
         const weekStart = startOfWeek(now, { weekStartsOn: 1 });
         const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-        const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+        const daysInWeek = eachDayOfInterval({
+          start: weekStart,
+          end: weekEnd,
+        });
 
         const weeklyStats = daysInWeek.map((day) => {
           const dayStr = format(day, "yyyy-MM-dd");
           const record = currentWeekRecords.find((r: any) => r.date === dayStr);
-          const hours = record ? parseFloat((record.workingHours || 0).toFixed(1)) : 0;
-          
-          // Determine status
+          const hours = record
+            ? parseFloat((record.workingHours || 0).toFixed(1))
+            : 0;
+
           let status = "none";
           const isHoliday = currentHolidays.some((h: any) => h.date === dayStr);
-          const isLeave = currentLeaves.some((l: any) => 
-            l.status === "approved" && 
-            dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") && 
-            dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd")
+          const isLeave = currentLeaves.some(
+            (l: any) =>
+              l.status === "approved" &&
+              dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") &&
+              dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd"),
           );
-          const isWeekOff = day.getDay() === 0 || day.getDay() === 6; // Sun = 0, Sat = 6
+          const isWeekOff = day.getDay() === 0 || day.getDay() === 6;
 
           if (hours > 0) {
             status = "present";
@@ -279,17 +319,6 @@ export const EmployeeDashboard = () => {
           };
         });
         setWeeklyData(weeklyStats);
-
-        if (balanceRes.ok) {
-          const balanceJson = await balanceRes.json();
-          if (balanceJson.success && Array.isArray(balanceJson.balances)) {
-            const totalRemaining = balanceJson.balances.reduce(
-              (sum: number, b: any) => sum + (b.remainingDays || 0),
-              0
-            );
-            setLeaveBalance(totalRemaining);
-          }
-        }
 
         if (activityRes.ok) {
           const activityJson = await activityRes.json();
@@ -335,21 +364,27 @@ export const EmployeeDashboard = () => {
             const now = new Date();
             const weekStart = startOfWeek(now, { weekStartsOn: 1 });
             const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
-            const daysInWeek = eachDayOfInterval({ start: weekStart, end: weekEnd });
+            const daysInWeek = eachDayOfInterval({
+              start: weekStart,
+              end: weekEnd,
+            });
             const weekRecords = historyJson.records || [];
-            
+
             const weeklyStats = daysInWeek.map((day) => {
               const dayStr = format(day, "yyyy-MM-dd");
               const record = weekRecords.find((r: any) => r.date === dayStr);
-              const hours = record ? parseFloat((record.workingHours || 0).toFixed(1)) : 0;
-              
+              const hours = record
+                ? parseFloat((record.workingHours || 0).toFixed(1))
+                : 0;
+
               // Determine status
               let status = "none";
               const isHoliday = holidays.some((h: any) => h.date === dayStr);
-              const isLeave = leaves.some((l: any) => 
-                l.status === "approved" && 
-                dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") && 
-                dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd")
+              const isLeave = leaves.some(
+                (l: any) =>
+                  l.status === "approved" &&
+                  dayStr >= format(parseISO(l.startDate), "yyyy-MM-dd") &&
+                  dayStr <= format(parseISO(l.endDate), "yyyy-MM-dd"),
               );
               const isWeekOff = day.getDay() === 0 || day.getDay() === 6; // Sun = 0, Sat = 6
 
@@ -509,21 +544,35 @@ export const EmployeeDashboard = () => {
                   <CardTitle className="text-sm font-medium">
                     Today's Activity
                   </CardTitle>
-                  <div className={`p-2 rounded-full ${
-                    !filteredActivities[0] ? "bg-muted/10" :
-                    filteredActivities[0].type === "check-in" ? "bg-green-500/10" :
-                    filteredActivities[0].type === "check-out" ? "bg-red-500/10" :
-                    filteredActivities[0].type === "leave-approved" ? "bg-purple-500/10" :
-                    "bg-orange-500/10"
-                  }`}>
+                  <div
+                    className={`p-2 rounded-full ${
+                      !filteredActivities[0]
+                        ? "bg-muted/10"
+                        : filteredActivities[0].type === "check-in"
+                          ? "bg-green-500/10"
+                          : filteredActivities[0].type === "check-out"
+                            ? "bg-red-500/10"
+                            : filteredActivities[0].type === "leave-approved"
+                              ? "bg-purple-500/10"
+                              : "bg-orange-500/10"
+                    }`}
+                  >
                     {!filteredActivities[0] ? (
                       <CheckCircle className="h-4 w-4 text-muted-foreground" />
                     ) : (
                       <>
-                        {filteredActivities[0].type === "check-in" && <CheckCircle className="h-4 w-4 text-green-600" />}
-                        {filteredActivities[0].type === "check-out" && <Clock className="h-4 w-4 text-red-600" />}
-                        {filteredActivities[0].type === "leave-approved" && <Calendar className="h-4 w-4 text-purple-600" />}
-                        {filteredActivities[0].type === "profile-update" && <User className="h-4 w-4 text-blue-600" />}
+                        {filteredActivities[0].type === "check-in" && (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        )}
+                        {filteredActivities[0].type === "check-out" && (
+                          <Clock className="h-4 w-4 text-red-600" />
+                        )}
+                        {filteredActivities[0].type === "leave-approved" && (
+                          <Calendar className="h-4 w-4 text-purple-600" />
+                        )}
+                        {filteredActivities[0].type === "profile-update" && (
+                          <User className="h-4 w-4 text-blue-600" />
+                        )}
                       </>
                     )}
                   </div>
@@ -531,17 +580,28 @@ export const EmployeeDashboard = () => {
                 <CardContent>
                   {filteredActivities[0] ? (
                     <>
-                      <div className={`text-2xl font-bold capitalize ${
-                        filteredActivities[0].type === "check-in" ? "text-green-600" :
-                        filteredActivities[0].type === "check-out" ? "text-red-600" :
-                        filteredActivities[0].type === "leave-approved" ? "text-purple-600" :
-                        "text-orange-600"
-                      }`}>
-                        {filteredActivities[0].type.replace('-', ' ')}
+                      <div
+                        className={`text-2xl font-bold capitalize ${
+                          filteredActivities[0].type === "check-in"
+                            ? "text-green-600"
+                            : filteredActivities[0].type === "check-out"
+                              ? "text-red-600"
+                              : filteredActivities[0].type === "leave-approved"
+                                ? "text-purple-600"
+                                : "text-orange-600"
+                        }`}
+                      >
+                        {filteredActivities[0].type.replace("-", " ")}
                       </div>
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <span className="truncate font-medium">
-                          {format(new Date(filteredActivities[0].timestamp || filteredActivities[0].createdAt), "hh:mm a")}
+                          {format(
+                            new Date(
+                              filteredActivities[0].timestamp ||
+                                filteredActivities[0].createdAt,
+                            ),
+                            "hh:mm a",
+                          )}
                         </span>
                       </p>
                     </>
@@ -572,9 +632,7 @@ export const EmployeeDashboard = () => {
                     </div>
                     <span>Upcoming Birthdays</span>
                   </CardTitle>
-                
                 </div>
-             
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-0 overflow-y-auto scrollbar-hide flex-1">
                 {upcomingBirthdays.length > 0 ? (
@@ -620,8 +678,8 @@ export const EmployeeDashboard = () => {
                               {emp.daysUntil === 0
                                 ? "Today! 🎂"
                                 : emp.daysUntil === 1
-                                ? "Tomorrow"
-                                : `In ${emp.daysUntil} days`}
+                                  ? "Tomorrow"
+                                  : `In ${emp.daysUntil} days`}
                             </span>
                           </div>
 
@@ -645,7 +703,6 @@ export const EmployeeDashboard = () => {
                           ? "No colleagues found"
                           : "No upcoming birthdays"}
                       </p>
-                     
                     </div>
                   </div>
                 )}
@@ -669,14 +726,26 @@ export const EmployeeDashboard = () => {
                 </div>
                 <div className="text-right hidden sm:block">
                   <div className="text-2xl font-bold text-primary">
-                    {weeklyData.reduce((sum, d) => sum + (d.status === 'present' ? d.hours : 0), 0).toFixed(1)}h
+                    {weeklyData
+                      .reduce(
+                        (sum, d) =>
+                          sum + (d.status === "present" ? d.hours : 0),
+                        0,
+                      )
+                      .toFixed(1)}
+                    h
                   </div>
-                  <div className="text-xs text-muted-foreground">Total this week</div>
+                  <div className="text-xs text-muted-foreground">
+                    Total this week
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="h-[280px] mt-2 relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={weeklyData} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+                  <BarChart
+                    data={weeklyData}
+                    margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
+                  >
                     <CartesianGrid
                       strokeDasharray="3 3"
                       vertical={false}
@@ -698,51 +767,80 @@ export const EmployeeDashboard = () => {
                       ticks={[0, 4, 8, 12, 16, 20, 24]}
                     />
                     <Tooltip
-                      cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                      cursor={{ fill: "rgba(0,0,0,0.02)" }}
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           const getStatusColor = (status: string) => {
                             switch (status) {
-                              case "present": return "bg-green-500";
-                              case "leave": return "bg-orange-500";
-                              case "holiday": return "bg-blue-500";
-                              case "absent": return "bg-red-500";
-                              case "weekoff": return "bg-yellow-500";
-                              default: return "bg-slate-300";
+                              case "present":
+                                return "bg-green-500";
+                              case "leave":
+                                return "bg-orange-500";
+                              case "holiday":
+                                return "bg-blue-500";
+                              case "absent":
+                                return "bg-red-500";
+                              case "weekoff":
+                                return "bg-yellow-500";
+                              default:
+                                return "bg-slate-300";
                             }
                           };
                           const getStatusText = (status: string) => {
                             switch (status) {
-                              case "present": return "Present";
-                              case "leave": return "On Leave";
-                              case "holiday": return "Holiday";
-                              case "absent": return "Absent";
-                              case "weekoff": return "Week Off";
-                              default: return "No Data";
+                              case "present":
+                                return "Present";
+                              case "leave":
+                                return "On Leave";
+                              case "holiday":
+                                return "Holiday";
+                              case "absent":
+                                return "Absent";
+                              case "weekoff":
+                                return "Week Off";
+                              default:
+                                return "No Data";
                             }
                           };
                           return (
                             <div className="bg-white p-3 shadow-xl rounded-lg border border-slate-100 animate-in fade-in zoom-in duration-200">
-                              <p className="text-xs font-semibold text-slate-500 mb-1">{data.fullDate}</p>
+                              <p className="text-xs font-semibold text-slate-500 mb-1">
+                                {data.fullDate}
+                              </p>
                               <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${getStatusColor(data.status)}`} />
-                                <p className="text-sm font-bold text-slate-900">{getStatusText(data.status)}</p>
+                                <div
+                                  className={`w-2 h-2 rounded-full ${getStatusColor(data.status)}`}
+                                />
+                                <p className="text-sm font-bold text-slate-900">
+                                  {getStatusText(data.status)}
+                                </p>
                               </div>
                               {data.status === "present" && (
-                                <p className="text-xs text-slate-500 mt-1">{data.displayHours} Working Hours</p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {data.displayHours} Working Hours
+                                </p>
                               )}
-                              {data.isToday && <p className="text-[10px] text-purple-600 font-medium mt-1">Today</p>}
+                              {data.isToday && (
+                                <p className="text-[10px] text-purple-600 font-medium mt-1">
+                                  Today
+                                </p>
+                              )}
                             </div>
                           );
                         }
                         return null;
                       }}
                     />
-                    <Bar dataKey="hours" radius={[6, 6, 0, 0]} barSize={50} minPointSize={6}>
+                    <Bar
+                      dataKey="hours"
+                      radius={[6, 6, 0, 0]}
+                      barSize={50}
+                      minPointSize={6}
+                    >
                       {weeklyData.map((entry, index) => {
                         let fill = "#f1f5f9";
-                        
+
                         switch (entry.status) {
                           case "present":
                             fill = "#22c55e";

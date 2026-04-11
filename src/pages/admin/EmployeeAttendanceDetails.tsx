@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft } from "lucide-react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft, Plus, Info, LayoutGrid } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -15,8 +15,49 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/api";
 
 type DayStatus = "Present" | "Absent" | "Leave" | "Week Off" | "Holiday" | "Half Day" | "Checked In";
+
+interface LeaveType {
+  _id: string;
+  id?: string;
+  name: string;
+  yearlyCount: number;
+  isActive: boolean;
+}
+
+interface EmployeeLeaveBalance {
+  _id: string;
+  leaveTypeId: {
+    _id: string;
+    name: string;
+  };
+  allocatedDays: number;
+  usedDays: number;
+  remainingDays: number;
+  year: string;
+  expiresAt?: string;
+  isAllocationBased?: boolean;
+}
 
 interface EmployeeDetailsResponse {
   success?: boolean;
@@ -84,6 +125,97 @@ export const EmployeeAttendanceDetails = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
+
+  // Leave allocation states
+  const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
+  const [employeeBalances, setEmployeeBalances] = useState<EmployeeLeaveBalance[]>([]);
+  const [isAllocating, setIsAllocating] = useState(false);
+  const [isAllocateDialogOpen, setIsAllocateDialogOpen] = useState(false);
+  const [selectedLeaveType, setSelectedLeaveType] = useState("");
+  const [leaveCount, setLeaveCount] = useState("");
+  const [validityDays, setValidityDays] = useState("30");
+
+  const VALIDITY_OPTIONS = [
+    { label: "7 Days", value: "7" },
+    { label: "15 Days", value: "15" },
+    { label: "30 Days", value: "30" },
+    { label: "45 Days", value: "45" },
+  ];
+
+  const fetchLeaveData = useCallback(async () => {
+    if (!token || !id) return;
+    try {
+      const [typesRes, balancesRes] = await Promise.all([
+        apiRequest<{ success: boolean; leaveTypes: LeaveType[] }>("/api/leave/types", { token }),
+        apiRequest<{ success: boolean; balances: EmployeeLeaveBalance[] }>(`/api/leave/balances?userId=${id}`, { token })
+      ]);
+      if (typesRes.success) setLeaveTypes(typesRes.leaveTypes.filter(t => t.isActive));
+      if (balancesRes.success) setEmployeeBalances(balancesRes.balances);
+    } catch (error) {
+      console.error("Failed to fetch leave data", error);
+    }
+  }, [id, token]);
+
+  useEffect(() => {
+    fetchLeaveData();
+  }, [fetchLeaveData]);
+
+  const handleAllocateLeave = async () => {
+    if (!selectedLeaveType || !leaveCount || !validityDays || !token || !id) {
+      toast({
+        title: "Error",
+        description: "Please fill all fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const days = parseInt(leaveCount);
+    if (isNaN(days) || days <= 0) {
+      toast({
+        title: "Error",
+        description: "Number of days must be a positive number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const validity = parseInt(validityDays);
+
+    setIsAllocating(true);
+    try {
+      const res = await apiRequest<{ success: boolean; message: string; expiryDate?: string }>("/api/leave/allocate-individual", {
+        method: "POST",
+        token,
+        body: {
+          userId: id,
+          leaveTypeId: selectedLeaveType,
+          allocatedDays: days,
+          validityDays: validity,
+        },
+      });
+
+      if (res.success) {
+        toast({
+          title: "Leave Allocated",
+          description: res.message || "Leave allocated successfully",
+        });
+        setIsAllocateDialogOpen(false);
+        setSelectedLeaveType("");
+        setLeaveCount("");
+        setValidityDays("30");
+        fetchLeaveData();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to allocate leave",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAllocating(false);
+    }
+  };
 
   // Calculate default 30 days range
   const today = new Date();
@@ -631,6 +763,89 @@ export const EmployeeAttendanceDetails = () => {
                 </p>
               </div>
             </div>
+
+            <Dialog open={isAllocateDialogOpen} onOpenChange={setIsAllocateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="shadow-lg shadow-primary/20 hover:scale-105 transition-all">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Allocate Leave
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Palmtree className="h-5 w-5 text-primary" />
+                    Allocate Extra Leave
+                  </DialogTitle>
+                  <DialogDescription>
+                    Manually add leave balance for {employee?.name}. The leave will be valid for the allocated number of days from today and will automatically expire after that period.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="leaveType">Leave Type</Label>
+                    <Select value={selectedLeaveType} onValueChange={setSelectedLeaveType}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select leave type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {leaveTypes.map((type) => (
+                          <SelectItem key={type._id} value={type._id}>
+                            {type.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="count">Number of Days</Label>
+                    <Input
+                      id="count"
+                      type="number"
+                      min="1"
+                      placeholder="e.g. 2"
+                      value={leaveCount}
+                      onChange={(e) => setLeaveCount(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="validity">Leave Validity</Label>
+                    <Select value={validityDays} onValueChange={setValidityDays}>
+                      <SelectTrigger id="validity">
+                        <SelectValue placeholder="Select validity" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VALIDITY_OPTIONS.map((opt) => (
+                          <SelectItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      ⏱ Expires on:{" "}
+                      <span className="font-medium text-foreground">
+                        {new Date(Date.now() + parseInt(validityDays) * 24 * 60 * 60 * 1000).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsAllocateDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAllocateLeave} disabled={isAllocating}>
+                    {isAllocating ? "Allocating..." : "Confirm Allocation"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
       
@@ -684,7 +899,7 @@ export const EmployeeAttendanceDetails = () => {
               </CardContent>
             </Card>
           </div>
-
+          
           <Card className="border shadow-sm bg-card">
             <CardHeader className="pb-3 border-b">
               <CardTitle className="text-lg font-semibold flex items-center gap-2">
