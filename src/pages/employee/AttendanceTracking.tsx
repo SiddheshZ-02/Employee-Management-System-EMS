@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree } from "lucide-react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
 import { toast } from "sonner";
@@ -20,8 +20,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import ManualAttendanceModal from "@/components/ManualAttendanceModal";
+import QuickCheckoutModal from "@/components/QuickCheckoutModal";
 
-type DayStatus = "Present" | "Absent" | "Leave" | "Week Off" | "Holiday" | "Half Day";
+type DayStatus = "Present" | "Absent" | "Leave" | "Week Off" | "Holiday" | "Half Day" | "In Progress";
 
 interface CalendarDay {
   date: string;
@@ -58,6 +60,7 @@ interface AttendanceRow {
   totalLabel: string;
   status: DayStatus;
   isWorkOnLeave?: boolean;
+  rawCheckInTime?: string | null;
 }
 
 interface Summary {
@@ -107,6 +110,13 @@ const AttendanceTracking = () => {
   const [filterEnd, setFilterEnd] = useState<string>(todayStr);
   const [startDate, setStartDate] = useState<string>(defaultStartDate);
   const [endDate, setEndDate] = useState<string>(todayStr);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [quickCheckoutModalOpen, setQuickCheckoutModalOpen] = useState(false);
+  const [selectedAttendance, setSelectedAttendance] = useState<{
+    date: string;
+    checkInTime: string;
+    checkInLabel: string;
+  } | null>(null);
 
   const fetchAttendance = useCallback(async () => {
     if (!token) {
@@ -162,7 +172,18 @@ const AttendanceTracking = () => {
         }
 
         let checkOutLabel = "-";
-        if (day.checkOutTime) {
+        let totalLabel = "-";
+        let status = day.status;
+
+        // Check if this is an incomplete session (checked in but not checked out)
+        const isInProgress = day.checkInTime && !day.checkOutTime;
+
+        if (isInProgress) {
+          // Show "In Progress" status instead of "Present"
+          status = "In Progress";
+          checkOutLabel = "-";
+          totalLabel = "-"; // Don't show hours for incomplete sessions
+        } else if (day.checkOutTime) {
           const d = new Date(day.checkOutTime);
           checkOutLabel = Number.isNaN(d.getTime())
             ? day.checkOutTime
@@ -171,13 +192,13 @@ const AttendanceTracking = () => {
                 hour: "2-digit",
                 minute: "2-digit",
               });
-        }
 
-        let totalLabel = "0h 0m";
-        if (typeof day.workingHours === "number") {
-          const h = Math.floor(day.workingHours);
-          const m = Math.round((day.workingHours - h) * 60);
-          totalLabel = `${h}h ${m}m`;
+          // Only show hours if session is complete
+          if (typeof day.workingHours === "number" && day.workingHours > 0) {
+            const h = Math.floor(day.workingHours);
+            const m = Math.round((day.workingHours - h) * 60);
+            totalLabel = `${h}h ${m}m`;
+          }
         }
 
         const workMode = day.workMode || "-";
@@ -189,8 +210,9 @@ const AttendanceTracking = () => {
           checkOutLabel,
           workMode,
           totalLabel,
-          status: day.status,
+          status,
           isWorkOnLeave: day.isWorkOnLeave,
+          rawCheckInTime: day.checkInTime,
         };
       });
 
@@ -275,6 +297,27 @@ const AttendanceTracking = () => {
     setCurrentPage(1);
   };
 
+  const handleManualAttendanceSuccess = () => {
+    // Refresh attendance data after successful manual entry
+    fetchAttendance();
+    toast.success("Attendance table refreshed with new entry.");
+  };
+
+  const handleQuickCheckoutSuccess = () => {
+    // Refresh attendance data after successful check-out update
+    fetchAttendance();
+    toast.success("Check-out time updated successfully!");
+  };
+
+  const handleOpenQuickCheckout = (row: AttendanceRow) => {
+    setSelectedAttendance({
+      date: row.date,
+      checkInTime: row.rawCheckInTime || "",
+      checkInLabel: row.checkInLabel,
+    });
+    setQuickCheckoutModalOpen(true);
+  };
+
   const getStatusBadge = (status: DayStatus, isWorkOnLeave?: boolean) => {
     switch (status) {
       case "Present":
@@ -335,6 +378,13 @@ const AttendanceTracking = () => {
               year: "numeric",
             })}
           </div>
+          <Button
+            onClick={() => setManualModalOpen(true)}
+            className="shadow-sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Manual Attendance
+          </Button>
         </div>
       </div>
 
@@ -567,13 +617,23 @@ const AttendanceTracking = () => {
                       <TableCell className="text-muted-foreground text-center">
                         <div className="flex items-center justify-center gap-2">
                           <Clock className="h-3.5 w-3.5 opacity-60" />
-                          {row.checkOutLabel}
+                          {row.checkOutLabel === "-" ? (
+                            <span className="text-xs text-muted-foreground">{"-"}</span>
+                          ) : (
+                            row.checkOutLabel
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
-                          {row.totalLabel}
-                        </span>
+                        {row.totalLabel === "-" ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-yellow-50 text-yellow-700 text-xs font-medium">
+                           {"-"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">
+                            {row.totalLabel}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-center">
                         {row.workMode === "Office" ? (
@@ -584,7 +644,28 @@ const AttendanceTracking = () => {
                           <span className="opacity-60">{row.workMode}</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center">{getStatusBadge(row.status, row.isWorkOnLeave)}</TableCell>
+                      <TableCell className="text-center">
+                        {row.status === "In Progress" ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => handleOpenQuickCheckout(row)}
+                                  className="bg-yellow-500/10 text-yellow-600 border-yellow-500/30 hover:bg-yellow-500/20 cursor-pointer px-2 py-1 rounded-md text-xs font-medium border transition-colors"
+                                >
+                                  In Progress
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">Click to add check-out time</p>
+                                <p className="text-[10px] text-muted-foreground">Hours not counted until check-out.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          getStatusBadge(row.status, row.isWorkOnLeave)
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -648,6 +729,23 @@ const AttendanceTracking = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Manual Attendance Modal */}
+      <ManualAttendanceModal
+        open={manualModalOpen}
+        onOpenChange={setManualModalOpen}
+        onSuccess={handleManualAttendanceSuccess}
+        accountCreatedAt={accountCreatedAtStr}
+        todayStr={todayStr}
+      />
+
+      {/* Quick Checkout Modal */}
+      <QuickCheckoutModal
+        open={quickCheckoutModalOpen}
+        onOpenChange={setQuickCheckoutModalOpen}
+        onSuccess={handleQuickCheckoutSuccess}
+        attendanceData={selectedAttendance}
+      />
     </div>
   );
 };
