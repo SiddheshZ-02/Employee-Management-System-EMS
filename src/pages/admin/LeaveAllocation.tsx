@@ -65,6 +65,8 @@ import {
 } from "@/store/slices/leaveSlice";
 import { setEmployees, type Employee } from "@/store/slices/employeeSlice";
 import AdminAllocateModal from "./components/AdminAllocateModal";
+import CarryForwardConfig from "./components/CarryForwardConfig";
+import YearEndResetModal from "./components/YearEndResetModal";
 
 export const LeaveAllocation = () => {
   const navigate = useNavigate();
@@ -84,6 +86,8 @@ export const LeaveAllocation = () => {
     _id: string;
     name: string;
   } | null>(null);
+
+  const [isYearEndResetOpen, setIsYearEndResetOpen] = useState(false);
 
   const getFinancialYears = () => {
     const today = new Date();
@@ -521,6 +525,11 @@ export const LeaveAllocation = () => {
       </div>
 
       <div className="space-y-8">
+        <CarryForwardConfig
+          leaveTypes={leaveTypes}
+          onSuccess={fetchData}
+        />
+
         <Card className="shadow-sm border-2">
           <CardHeader className="bg-muted/90">
             <CardTitle className="text-lg flex items-center">
@@ -741,6 +750,13 @@ export const LeaveAllocation = () => {
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 ) : null}
                 {isGranting ? "Granting..." : "Grant Yearly Leaves"}
+              </Button>
+              <Button
+                onClick={() => setIsYearEndResetOpen(true)}
+                variant="outline"
+                className="h-9 shadow-md"
+              >
+                Year-End Reset
               </Button>
             </div>
           </CardHeader>
@@ -1195,6 +1211,16 @@ export const LeaveAllocation = () => {
         onSuccess={() => {
           fetchGrantStatus();
         }}
+      />
+
+      <YearEndResetModal
+        isOpen={isYearEndResetOpen}
+        onClose={() => setIsYearEndResetOpen(false)}
+        onSuccess={() => {
+          fetchData();
+          fetchGrantStatus();
+        }}
+        grantYear={grantYear}
       />
     </div>
   );

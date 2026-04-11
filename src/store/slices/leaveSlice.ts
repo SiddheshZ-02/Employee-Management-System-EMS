@@ -28,6 +28,10 @@ export interface LeaveType {
   name: string;
   yearlyCount: number;
   isActive: boolean;
+  carryForwardEnabled?: boolean;
+  maxCarryForwardDays?: number;
+  expiryType?: 'fixed_date' | 'financial_year' | 'rolling';
+  fixedExpiryDate?: string;
 }
 
 interface LeaveBalances {
