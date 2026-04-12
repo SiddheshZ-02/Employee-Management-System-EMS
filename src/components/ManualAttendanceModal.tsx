@@ -5,7 +5,6 @@ import {
   Briefcase,
   Home,
   FileText,
-  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {

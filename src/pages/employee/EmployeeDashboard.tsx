@@ -24,7 +24,6 @@ import {
 import { API_BASE_URL } from "@/constant/Config";
 import { UpcomingHolidaysWidget } from "@/components/dashboard/UpcomingHolidaysWidget";
 import { Badge } from "@/components/ui/badge";
-import EmployeeLeaveCard from "./components/EmployeeLeaveCard";
 import {
   format,
   parseISO,
@@ -107,7 +106,6 @@ export const EmployeeDashboard = () => {
 
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
-  const [leaveCards, setLeaveCards] = useState<any[]>([]);
   const [holidays, setHolidaysState] = useState<any[]>([]);
 
   useEffect(() => {
@@ -171,7 +169,7 @@ export const EmployeeDashboard = () => {
           const leaveCardsJson = await leaveCardsRes.json();
           if (leaveCardsJson.success) {
             const cards = leaveCardsJson.leaveCards || [];
-            setLeaveCards(cards);
+            // Leave cards data fetched but not currently displayed
             
             if (balanceRes.ok) {
               const balanceJson = await balanceRes.json();

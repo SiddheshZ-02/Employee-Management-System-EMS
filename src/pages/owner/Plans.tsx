@@ -88,7 +88,7 @@ export const PlansPage = () => {
                 formatter={(v: any) => [`₹${v.toLocaleString()}`, "Revenue"]} 
               />
               <Bar dataKey="revenue" radius={[6, 6, 0, 0]}>
-                {planStats.map((entry, index) => (
+                {planStats.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={["#4ade80", "#38bdf8", "#a78bfa"][index % 3]} />
                 ))}
               </Bar>

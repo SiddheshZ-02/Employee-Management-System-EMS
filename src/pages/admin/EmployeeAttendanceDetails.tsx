@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft, Plus, Info, LayoutGrid } from "lucide-react";
+import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -128,7 +128,8 @@ export const EmployeeAttendanceDetails = () => {
 
   // Leave allocation states
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
-  const [employeeBalances, setEmployeeBalances] = useState<EmployeeLeaveBalance[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_employeeBalances, setEmployeeBalances] = useState<EmployeeLeaveBalance[]>([]);
   const [isAllocating, setIsAllocating] = useState(false);
   const [isAllocateDialogOpen, setIsAllocateDialogOpen] = useState(false);
   const [selectedLeaveType, setSelectedLeaveType] = useState("");

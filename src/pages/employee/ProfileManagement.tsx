@@ -8,16 +8,11 @@ import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { updateProfile } from '@/store/slices/authSlice';
 import { toast } from '@/hooks/use-toast';
 import { 
-  User, 
   Save, 
   Mail, 
   Phone, 
-  Building2, 
-  Briefcase, 
   ShieldCheck,
-  Hash,
   CalendarDays,
-  Cake,
   Loader2,
   Edit3
 } from 'lucide-react';
@@ -39,7 +34,7 @@ interface UserProfile {
 }
 
 export const ProfileManagement = () => {
-  const { user, token } = useAppSelector(state => state.auth);
+  const { token } = useAppSelector(state => state.auth);
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

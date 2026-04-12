@@ -22,6 +22,7 @@ interface AdminAllocateModalProps {
 const AdminAllocateModal: React.FC<AdminAllocateModalProps> = ({ isOpen, onClose, employee, onSuccess }) => {
   const [leaveTypeId, setLeaveTypeId] = useState('');
   const [days, setDays] = useState('');
+  const [validityDays, setValidityDays] = useState('40');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { leaveTypes } = useAppSelector((state) => state.leave);
   const { toast } = useToast();
@@ -48,12 +49,13 @@ const AdminAllocateModal: React.FC<AdminAllocateModalProps> = ({ isOpen, onClose
 
     setIsSubmitting(true);
     try {
-      const response = await apiRequest<{ success: boolean; expiryDate: string }>('/leave/allocations', {
+      const response = await apiRequest<{ success: boolean; expiryDate: string }>('/leave/allocate-individual', {
         method: 'POST',
         body: {
           userId: employee._id,
           leaveTypeId,
-          days: daysNum,
+          allocatedDays: daysNum,
+          validityDays: parseInt(validityDays),
         },
         token: localStorage.getItem('ems_token'),
       });
@@ -70,6 +72,7 @@ const AdminAllocateModal: React.FC<AdminAllocateModalProps> = ({ isOpen, onClose
         onClose();
         setLeaveTypeId('');
         setDays('');
+        setValidityDays('40');
       }
     } catch (error: any) {
       toast({
@@ -122,6 +125,25 @@ const AdminAllocateModal: React.FC<AdminAllocateModalProps> = ({ isOpen, onClose
               min="1"
               max="99"
             />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="validity" className="text-right">
+              Validity
+            </Label>
+            <Select value={validityDays} onValueChange={setValidityDays}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Select validity period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7">7 days</SelectItem>
+                <SelectItem value="15">15 days</SelectItem>
+                <SelectItem value="30">30 days</SelectItem>
+                <SelectItem value="40">40 days (Default)</SelectItem>
+                <SelectItem value="45">45 days</SelectItem>
+                <SelectItem value="60">60 days</SelectItem>
+                <SelectItem value="90">90 days</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <DialogFooter>

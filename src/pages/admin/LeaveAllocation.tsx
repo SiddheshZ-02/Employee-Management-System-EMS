@@ -94,7 +94,7 @@ export const LeaveAllocation = () => {
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
 
-    let startYear = currentMonth < 3 ? currentYear - 1 : currentYear;
+    const startYear = currentMonth < 3 ? currentYear - 1 : currentYear;
 
     const years = [];
     for (let i = 0; i < 3; i++) {
@@ -120,6 +120,7 @@ export const LeaveAllocation = () => {
       employeeId: string;
       employeeName: string;
       grantedTypes: string[];
+      updatedTypes: string[];
       skippedTypes: string[];
     }>;
     failed: Array<{
@@ -204,7 +205,7 @@ export const LeaveAllocation = () => {
       ]);
       if (typesRes.success) dispatch(setLeaveTypes(typesRes.leaveTypes));
       if (empsRes.success) dispatch(setEmployees(empsRes.employees));
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch data");
     } finally {
       setIsLoading(false);
@@ -274,7 +275,7 @@ export const LeaveAllocation = () => {
         setIsAddingType(false);
         toast.success("Leave type added successfully");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to add leave type");
     }
   };
@@ -299,7 +300,7 @@ export const LeaveAllocation = () => {
         setEditingType(null);
         toast.success("Leave type updated successfully");
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to update leave type");
     }
   };
@@ -363,6 +364,7 @@ export const LeaveAllocation = () => {
         partialSuccess?: boolean;
         message: string;
         grantedCount?: number;
+        updatedCount?: number;
         skippedCount?: number;
         processedCount?: number;
         failedCount?: number;
@@ -370,6 +372,7 @@ export const LeaveAllocation = () => {
           processed: Array<{
             employeeId: string;
             grantedTypes: string[];
+            updatedTypes: string[];
             skippedTypes: string[];
           }>;
           failed: Array<{
@@ -389,7 +392,9 @@ export const LeaveAllocation = () => {
 
       if (res.success) {
         const granted = res.grantedCount || 0;
-        const skipped = res.skippedCount || 0;
+        const updated = res.updatedCount || 0;
+        // const _skipped = res.skippedCount
+        //  || 0; // Not currently displayed
         const processed = res.processedCount || 0;
         const failed = res.failedCount || 0;
 
@@ -401,51 +406,45 @@ export const LeaveAllocation = () => {
           };
         });
 
-        setGrantResult({
-          success: !res.partialSuccess,
-          message: res.message,
-          processed: processedWithNames,
-          failed: res.details?.failed || []
+        const failedWithNames = (res.details?.failed || []).map(f => {
+          const emp = employees.find(e => (e._id || e.id) === f.employeeId);
+          return {
+            ...f,
+            employeeName: emp?.name || 'Unknown'
+          };
         });
 
-        if (res.partialSuccess && failed > 0) {
-          toast.warning(
-            `Partially completed: Granted leaves to ${processed} employee(s), failed ${failed}`
-          );
-        } else if (granted > 0 && skipped > 0) {
-          toast.success(
-            `Granted leave balances to ${processed} employees (${granted} new, ${skipped} already granted)`
-          );
-        } else if (granted > 0) {
-          toast.success(
-            `Successfully granted leave balances to ${processed} employees`
-          );
+        setGrantResult({
+          success: true,
+          message: res.message,
+          processed: processedWithNames,
+          failed: failedWithNames,
+        });
+
+        if (failed === 0) {
+          toast.success(`Successfully processed ${processed} employee(s) - ${granted} new grants, ${updated} updates`);
         } else {
-          toast.info(
-            `All ${skipped} employees already have leaves granted for ${grantYear}`
-          );
+          toast.warning(`Processed ${processed} employee(s), failed ${failed}`);
         }
 
-        setSelectedEmployees([]);
+        const grantedEmployeeIds = processedWithNames.map(p => p.employeeId);
+        await refreshGrantedEmployeeBalances(grantedEmployeeIds);
+        
         await fetchGrantStatus();
         
-        console.log('⏳ Waiting 500ms for database commit...');
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        const processedEmployeeIds = res.details?.processed?.map(p => p.employeeId) || [];
-        await refreshGrantedEmployeeBalances(processedEmployeeIds);
-        
-        try {
-          localStorage.setItem('ems_leave_updated', Date.now().toString());
-        } catch (e) {
-          console.warn('Failed to update localStorage', e);
-        }
+        setSelectedEmployees([]);
+        setIsGrantConfirmOpen(false);
       }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred while granting leaves");
+      toast.error(error.message || "Failed to grant leaves");
+      setGrantResult({
+        success: false,
+        message: error.message || "Failed to grant leaves",
+        processed: [],
+        failed: [],
+      });
     } finally {
       setIsGranting(false);
-      setIsGrantConfirmOpen(false);
     }
   };
 
@@ -455,6 +454,11 @@ export const LeaveAllocation = () => {
 
   const getAlreadyGrantedCount = () => {
     return selectedEmployees.filter((empId) => grantStatusMap[empId]).length;
+  };
+
+  const handleYearEndResetSuccess = async () => {
+    await fetchData();
+    await fetchGrantStatus();
   };
 
   return (
@@ -805,7 +809,7 @@ export const LeaveAllocation = () => {
                             )
                           }
                           onCheckedChange={handleSelectAll}
-                          className="h-5 w-5 rounded-none border-2 border-slate-300 data-[state=checked]:!bg-green-600 data-[state=checked]:!border-green-600"
+                          className="h-6 w-1 rounded-sm border-2 border-slate-600 data-[state=checked]:!bg-green-600 data-[state=checked]:!border-green-600"
                         />
                       </TableHead>
                       <TableHead className="text-center w-[80px]">
@@ -836,7 +840,7 @@ export const LeaveAllocation = () => {
                               onCheckedChange={(checked) =>
                                 handleSelectEmployee(empId, checked as boolean)
                               }
-                              className="h-5 w-5 rounded-none border-2 border-slate-300 data-[state=checked]:!bg-green-600 data-[state=checked]:!border-green-600"
+                              className="h-6 w-2 rounded-sm border-2 border-slate-600 data-[state=checked]:!bg-green-600 data-[state=checked]:!border-green-600"
                             />
                           </TableCell>
                           <TableCell className="text-center font-medium text-muted-foreground">
@@ -1145,14 +1149,19 @@ export const LeaveAllocation = () => {
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{idx + 1}. {emp.employeeName}</p>
-                          {emp.grantedTypes.length > 0 && (
+                          {(emp as any).grantedTypes && (emp as any).grantedTypes.length > 0 && (
                             <p className="text-xs text-green-600 mt-1">
-                              ✓ Granted: {emp.grantedTypes.join(", ")}
+                              ✓ Newly Granted: {(emp as any).grantedTypes.join(", ")}
                             </p>
                           )}
-                          {emp.skippedTypes.length > 0 && (
+                          {(emp as any).updatedTypes && (emp as any).updatedTypes.length > 0 && (
+                            <p className="text-xs text-blue-600 mt-1">
+                              🔄 Updated: {(emp as any).updatedTypes.join(", ")}
+                            </p>
+                          )}
+                          {(emp as any).skippedTypes && (emp as any).skippedTypes.length > 0 && (
                             <p className="text-xs text-yellow-600 mt-1">
-                              ⊘ Skipped: {emp.skippedTypes.join(", ")}
+                              ⊘ Skipped (already active): {(emp as any).skippedTypes.join(", ")}
                             </p>
                           )}
                         </div>
@@ -1216,11 +1225,7 @@ export const LeaveAllocation = () => {
       <YearEndResetModal
         isOpen={isYearEndResetOpen}
         onClose={() => setIsYearEndResetOpen(false)}
-        onSuccess={() => {
-          fetchData();
-          fetchGrantStatus();
-        }}
-        grantYear={grantYear}
+        onSuccess={handleYearEndResetSuccess}
       />
     </div>
   );

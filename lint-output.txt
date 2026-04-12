@@ -1,0 +1,123 @@
+
+> ap@0.0.0 lint
+> eslint .
+
+
+c:\Practise\Employee-Management-System-EMS\src\components\ManualAttendanceModal.tsx
+  123:22  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\components\ui\badge.tsx
+  46:17  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+c:\Practise\Employee-Management-System-EMS\src\components\ui\button.tsx
+  59:18  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+c:\Practise\Employee-Management-System-EMS\src\components\ui\form.tsx
+  159:3  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+c:\Practise\Employee-Management-System-EMS\src\components\ui\sidebar.tsx
+  725:3  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+c:\Practise\Employee-Management-System-EMS\src\components\ui\theme-provider.tsx
+  66:14  error  Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components  react-refresh/only-export-components
+
+c:\Practise\Employee-Management-System-EMS\src\hooks\use-toast.ts
+  18:7  error  'actionTypes' is assigned a value but only used as a type  @typescript-eslint/no-unused-vars
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\AdminLeaveRequests.tsx
+  114:27  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  130:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  131:20  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\CompanyHolidays.tsx
+  127:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  213:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  245:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\EmployeeAttendanceDetails.tsx
+  210:21  error    Unexpected any. Specify a different type                                                                  @typescript-eslint/no-explicit-any
+  250:6   warning  React Hook useEffect has a missing dependency: 'today'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\LeaveAllocation.tsx
+   190:6   warning  React Hook useEffect has a missing dependency: 'fetchGrantStatus'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+   255:6   warning  React Hook useEffect has a missing dependency: 'fetchData'. Either include it or remove the dependency array         react-hooks/exhaustive-deps
+   324:21  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+   438:21  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1152:36  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1152:65  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1154:57  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1157:36  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1157:65  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1159:52  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1162:36  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1162:65  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  1164:68  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\components\AdminAllocateModal.tsx
+  77:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\components\CarryForwardConfig.tsx
+  55:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  94:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\admin\components\YearEndResetModal.tsx
+  43:91  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  64:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\employee\EmployeeDashboard.tsx
+   78:62  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+   89:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  107:48  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  108:40  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  109:49  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  165:66  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  178:23  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  182:36  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  187:39  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  283:54  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  289:54  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  291:17  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  373:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  380:51  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  382:21  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\employee\Holidays.tsx
+  91:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\employee\LeaveManagement.tsx
+  149:6   warning  React Hook useEffect has a missing dependency: 'getRemainingDays'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+  164:55  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  270:21  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  294:21  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  383:23  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+  388:44  error    Unexpected any. Specify a different type                                                                             @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\employee\ProfileManagement.tsx
+  107:6  warning  React Hook useEffect has a missing dependency: 'fetchProfile'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\Billing.tsx
+  28:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  80:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\CompanyDetails.tsx
+  308:75  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\CompanyList.tsx
+  50:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\OwnerDashboard.tsx
+   42:72  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  108:34  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\Plans.tsx
+  20:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+  88:32  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\pages\owner\Support.tsx
+  15:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+c:\Practise\Employee-Management-System-EMS\src\store\slices\leaveSlice.ts
+  49:16  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any
+
+✖ 66 problems (61 errors, 5 warnings)
+

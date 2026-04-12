@@ -87,7 +87,7 @@ export async function apiRequest<T = unknown>(
     try {
       const errorJson = await response.json();
       errorMessage = errorJson.message || errorMessage;
-    } catch (e) {
+    } catch {
       errorMessage = (await response.text()) || errorMessage;
     }
     throw new Error(errorMessage);

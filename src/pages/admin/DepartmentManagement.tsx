@@ -376,7 +376,7 @@ export const DepartmentManagement = () => {
         title: "Department Deleted",
         description: `${department.name} has been removed from the system`,
       });
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to delete department",

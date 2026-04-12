@@ -124,7 +124,7 @@ const CarryForwardConfig: React.FC<CarryForwardConfigProps> = ({ leaveTypes, onS
                 <Checkbox
                   checked={isEnabled}
                   onCheckedChange={(checked) => handleToggleCarryForward(id, checked as boolean)}
-                  className="h-5 w-5"
+                  className="h-6 w-2 rounded-sm border-2 border-slate-300 data-[state=checked]:!bg-green-600 data-[state=checked]:!border-green-600"
                 />
                 <div>
                   <p className="font-medium">{leaveType.name}</p>

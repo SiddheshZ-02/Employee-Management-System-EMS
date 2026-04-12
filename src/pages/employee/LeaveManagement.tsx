@@ -54,10 +54,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useForm } from "react-hook-form";
-import { Plus, X, CalendarDays, AlertCircle, ChevronLeft, ChevronRight, Check } from "lucide-react";
+import { Plus, X, CalendarDays, AlertCircle, ChevronLeft, ChevronRight, Check, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { apiRequest } from "@/lib/api";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface LeaveFormData {
   leaveTypeId: string;
@@ -193,7 +199,7 @@ const LeaveManagement = () => {
     
     const interval = setInterval(() => {
       fetchData();
-    }, 24 * 60 * 60 * 1000);
+    }, 2 * 60 * 1000);
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'ems_leave_updated') {
@@ -329,7 +335,7 @@ const LeaveManagement = () => {
   const start = (current - 1) * pageSize;
   const paginatedRequests = filteredRequests.slice(start, start + pageSize);
 
-  // Merge yearly balances with granted leaves
+  // Merge yearly balances with granted leaves - KEEP THEM SEPARATE and SHOW ALL
   const unifiedLeaveData = useCallback(() => {
     const map = new Map<string, {
       leaveTypeId: string;
@@ -340,12 +346,38 @@ const LeaveManagement = () => {
       grantedRemaining: number;
       grantedTotal: number;
       grantedUsed: number;
+      carriedForwardDays: number;
       earliestExpiryDays: number | null;
       earliestExpiryDate: string | null;
       hasGrantedLeaves: boolean;
+      hasCarriedForward: boolean;
+      isYearlyGrant: boolean;
+      isIndividualGrant: boolean;
     }>();
 
-    // Add ONLY yearly balances (filter out allocation-based ones)
+    // Step 1: Add ALL active leave types from leaveTypes to ensure all cards show
+    leaveTypes.filter(t => t.isActive).forEach(leaveType => {
+      const typeId = String(leaveType._id || leaveType.id);
+      map.set(typeId, {
+        leaveTypeId: typeId,
+        leaveTypeName: leaveType.name,
+        yearlyRemaining: 0,
+        yearlyAllocated: 0,
+        yearlyUsed: 0,
+        grantedRemaining: 0,
+        grantedTotal: 0,
+        grantedUsed: 0,
+        carriedForwardDays: 0,
+        earliestExpiryDays: null,
+        earliestExpiryDate: null,
+        hasGrantedLeaves: false,
+        hasCarriedForward: false,
+        isYearlyGrant: false,
+        isIndividualGrant: false,
+      });
+    });
+
+    // Step 2: Update with yearly balances (from BULK grant - shows as "Y:")
     employeeLeaveBalances.forEach(balance => {
       // Skip allocation-based balances - they're handled separately via leaveCards
       if ((balance as any).isAllocationBased) {
@@ -353,34 +385,62 @@ const LeaveManagement = () => {
       }
 
       const typeId = String(balance.leaveTypeId?._id || balance.leaveTypeId?.id || balance.leaveTypeId);
-      map.set(typeId, {
-        leaveTypeId: typeId,
-        leaveTypeName: balance.leaveTypeId?.name || 'Leave',
-        yearlyRemaining: balance.remainingDays,
-        yearlyAllocated: balance.allocatedDays,
-        yearlyUsed: balance.usedDays,
-        grantedRemaining: 0,
-        grantedTotal: 0,
-        grantedUsed: 0,
-        earliestExpiryDays: null,
-        earliestExpiryDate: null,
-        hasGrantedLeaves: false,
-      });
+      const isCarriedForward = (balance as any).isCarriedForward === true;
+      const isActive = balance.status === 'active';
+      
+      // Only show yearly allocated if it's active and not carried forward
+      const shouldShowYearlyAllocated = isActive && !isCarriedForward;
+      
+      if (map.has(typeId)) {
+        const existing = map.get(typeId)!;
+        if (shouldShowYearlyAllocated) {
+          existing.yearlyRemaining = balance.remainingDays;
+          existing.yearlyAllocated = balance.allocatedDays;
+          existing.yearlyUsed = balance.usedDays;
+          existing.isYearlyGrant = true;
+        }
+        if (isCarriedForward) {
+          existing.carriedForwardDays = balance.remainingDays;
+          existing.hasCarriedForward = true;
+        }
+      } else {
+        // If leave type doesn't exist in map, add it
+        map.set(typeId, {
+          leaveTypeId: typeId,
+          leaveTypeName: balance.leaveTypeId?.name || 'Leave',
+          yearlyRemaining: shouldShowYearlyAllocated ? balance.remainingDays : 0,
+          yearlyAllocated: shouldShowYearlyAllocated ? balance.allocatedDays : 0,
+          yearlyUsed: shouldShowYearlyAllocated ? balance.usedDays : 0,
+          grantedRemaining: 0,
+          grantedTotal: 0,
+          grantedUsed: 0,
+          carriedForwardDays: isCarriedForward ? balance.remainingDays : 0,
+          earliestExpiryDays: null,
+          earliestExpiryDate: null,
+          hasGrantedLeaves: false,
+          hasCarriedForward: isCarriedForward,
+          isYearlyGrant: shouldShowYearlyAllocated,
+          isIndividualGrant: false,
+        });
+      }
     });
 
-    // Merge granted leaves from leaveCards (which comes from LeaveAllocation)
+    // Step 3: Merge granted leaves from leaveCards (INDIVIDUAL allocation - shows as "G:")
     leaveCards.forEach(card => {
       const typeId = String(card.leave_type_id);
-      const existing = map.get(typeId);
-
-      if (existing) {
+      
+      if (map.has(typeId)) {
+        // Update existing entry with individual grant data
+        const existing = map.get(typeId)!;
         existing.grantedRemaining = card.available_days;
         existing.grantedTotal = card.total_days;
         existing.grantedUsed = card.used_days;
         existing.earliestExpiryDays = card.expires_in_days;
         existing.earliestExpiryDate = card.expiry_date;
-        existing.hasGrantedLeaves = true;
+        existing.hasGrantedLeaves = card.available_days > 0;
+        existing.isIndividualGrant = card.available_days > 0;
       } else {
+        // Add new entry for individual grant
         map.set(typeId, {
           leaveTypeId: typeId,
           leaveTypeName: card.leave_type_name,
@@ -390,40 +450,33 @@ const LeaveManagement = () => {
           grantedRemaining: card.available_days,
           grantedTotal: card.total_days,
           grantedUsed: card.used_days,
+          carriedForwardDays: 0,
           earliestExpiryDays: card.expires_in_days,
           earliestExpiryDate: card.expiry_date,
-          hasGrantedLeaves: true,
+          hasGrantedLeaves: card.available_days > 0,
+          hasCarriedForward: false,
+          isYearlyGrant: false,
+          isIndividualGrant: card.available_days > 0,
         });
       }
     });
 
     return Array.from(map.values());
-  }, [employeeLeaveBalances, leaveCards]);
+  }, [leaveTypes, employeeLeaveBalances, leaveCards]);
 
   const unifiedLeaves = unifiedLeaveData();
 
-  // Calculate display values - show granted leaves SEPARATELY from yearly
+  // Calculate display values - Show all sources combined
   const getDisplayDays = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
-    // If granted leaves exist, show ONLY granted (not combined)
-    if (item.hasGrantedLeaves && item.grantedTotal > 0) {
-      return item.grantedRemaining;
-    }
-    // Otherwise show yearly balance
-    return item.yearlyRemaining;
+    return item.yearlyRemaining + item.grantedRemaining + item.carriedForwardDays;
   };
 
   const getDisplayAllocated = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
-    if (item.hasGrantedLeaves && item.grantedTotal > 0) {
-      return item.grantedTotal;
-    }
-    return item.yearlyAllocated;
+    return item.yearlyAllocated + item.grantedTotal + item.carriedForwardDays;
   };
 
   const getDisplayUsed = (item: ReturnType<typeof unifiedLeaveData>[0]) => {
-    if (item.hasGrantedLeaves && item.grantedUsed > 0) {
-      return item.grantedUsed;
-    }
-    return item.yearlyUsed;
+    return item.yearlyUsed + item.grantedUsed;
   };
 
   return (
@@ -672,6 +725,7 @@ const LeaveManagement = () => {
               )}
             </div>
 
+            {/* Show ALL leave types that have been granted (even if 0 balance) */}
             {unifiedLeaves.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {unifiedLeaves.map((item) => {
@@ -689,8 +743,8 @@ const LeaveManagement = () => {
                       key={item.leaveTypeId}
                       className="hover-lift transition-smooth border-border/50 relative overflow-hidden hover:shadow-md group"
                     >
-                      {/* Top accent bar for expiry warning */}
-                      {hasExpiryWarning && (
+                      {/* Top accent bar for expiry warning (only for individual grants) */}
+                      {item.isIndividualGrant && item.hasGrantedLeaves && item.earliestExpiryDays !== null && (
                         <div className={`absolute top-0 left-0 right-0 h-1 ${
                           urgencyLevel === 'critical' ? 'bg-red-500' : 
                           urgencyLevel === 'warning' ? 'bg-amber-500' : 
@@ -703,13 +757,13 @@ const LeaveManagement = () => {
                         <div className="flex items-start justify-between gap-2 mb-3">
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div className={`p-2 rounded-lg transition-colors shrink-0 ${
-                              urgencyLevel === 'critical' ? 'bg-red-500/10' : 
-                              urgencyLevel === 'warning' ? 'bg-amber-500/10' : 
+                              item.isIndividualGrant && urgencyLevel === 'critical' ? 'bg-red-500/10' : 
+                              item.isIndividualGrant && urgencyLevel === 'warning' ? 'bg-amber-500/10' : 
                               'bg-primary/10'
                             }`}>
                               <CalendarDays className={`h-4 w-4 ${
-                                urgencyLevel === 'critical' ? 'text-red-500' : 
-                                urgencyLevel === 'warning' ? 'text-amber-500' : 
+                                item.isIndividualGrant && urgencyLevel === 'critical' ? 'text-red-500' : 
+                                item.isIndividualGrant && urgencyLevel === 'warning' ? 'text-amber-500' : 
                                 'text-primary'
                               }`} />
                             </div>
@@ -720,8 +774,8 @@ const LeaveManagement = () => {
                             </div>
                           </div>
 
-                          {/* Expiry badge */}
-                          {hasExpiryWarning && (
+                          {/* Expiry badge (only for individual grants) */}
+                          {item.isIndividualGrant && item.hasGrantedLeaves && item.earliestExpiryDays !== null && (
                             <Badge
                               variant="outline"
                               className={`text-[10px] font-semibold px-1.5 py-0 shrink-0 border ${
@@ -773,8 +827,8 @@ const LeaveManagement = () => {
                           </div>
                         </div>
 
-                        {/* Expiry footer - compact */}
-                        {hasExpiryWarning && item.grantedRemaining > 0 && (
+                        {/* Expiry footer - ONLY for individual grants (G:) */}
+                        {item.isIndividualGrant && item.hasGrantedLeaves && item.grantedRemaining > 0 && item.earliestExpiryDays !== null && (
                           <div className={`flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded ${
                             urgencyLevel === 'critical' 
                               ? 'bg-red-50 text-red-600 dark:bg-red-900/20' 
@@ -789,20 +843,75 @@ const LeaveManagement = () => {
                           </div>
                         )}
 
-                        {/* Breakdown - ultra compact */}
-                        {(item.yearlyAllocated > 0 || item.hasGrantedLeaves) && (
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1">
-                            {item.yearlyAllocated > 0 && (
-                              <span className="px-1.5 py-0.5 rounded bg-muted/50">
-                                Y: {item.yearlyRemaining}
-                              </span>
-                            )}
-                            {item.hasGrantedLeaves && item.grantedTotal > 0 && (
-                              <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary">
-                                G: {item.grantedRemaining}
-                              </span>
-                            )}
-                          </div>
+                        {/* Breakdown with tooltips - Shows Y, CF, and G separately */}
+                        {(item.yearlyAllocated > 0 || item.hasGrantedLeaves || item.hasCarriedForward) && (
+                          <TooltipProvider>
+                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground pt-1 flex-wrap">
+                              {/* Carried Forward - Purple */}
+                              {item.hasCarriedForward && item.carriedForwardDays > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="px-2 py-1 rounded bg-purple-500/10 text-purple-600 font-medium cursor-help flex items-center gap-1 hover:bg-purple-500/20 transition-colors">
+                                      <Info className="h-3 w-3" />
+                                      CF: {item.carriedForwardDays}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[200px]">
+                                    <p className="font-semibold text-purple-600">Carried Forward</p>
+                                    <p className="text-xs mt-1">
+                                      {item.carriedForwardDays} days carried forward from previous year
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              
+                              {/* Yearly Grant - Blue (NO EXPIRY) */}
+                              {item.isYearlyGrant && item.yearlyAllocated > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="px-2 py-1 rounded bg-blue-500/10 text-blue-600 font-medium cursor-help flex items-center gap-1 hover:bg-blue-500/20 transition-colors">
+                                      <Info className="h-3 w-3" />
+                                      Y: {item.yearlyRemaining}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[200px]">
+                                    <p className="font-semibold text-blue-600">Yearly Grant</p>
+                                    <div className="text-xs mt-1 space-y-0.5">
+                                      <p>Allocated: {item.yearlyAllocated} days</p>
+                                      <p>Used: {item.yearlyUsed} days</p>
+                                      <p>Remaining: {item.yearlyRemaining} days</p>
+                                      <p className="text-green-600 font-medium mt-1">✓ No expiry date</p>
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              
+                              {/* Individual Grant - Green (WITH EXPIRY) */}
+                              {item.isIndividualGrant && item.grantedTotal > 0 && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="px-2 py-1 rounded bg-green-500/10 text-green-600 font-medium cursor-help flex items-center gap-1 hover:bg-green-500/20 transition-colors">
+                                      <Info className="h-3 w-3" />
+                                      G: {item.grantedRemaining}
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-[220px]">
+                                    <p className="font-semibold text-green-600">Individual Grant</p>
+                                    <div className="text-xs mt-1 space-y-0.5">
+                                      <p>Total Granted: {item.grantedTotal} days</p>
+                                      <p>Used: {item.grantedUsed} days</p>
+                                      <p>Remaining: {item.grantedRemaining} days</p>
+                                      {item.earliestExpiryDays !== null && (
+                                        <p className="text-amber-600 font-medium mt-1">
+                                          ⚠️ Expires in {item.earliestExpiryDays} days
+                                        </p>
+                                      )}
+                                    </div>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                            </div>
+                          </TooltipProvider>
                         )}
                       </CardContent>
                     </Card>
