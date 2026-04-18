@@ -66,6 +66,11 @@ const OwnerSettingsLazy = lazy(() =>
     default: m.SettingsPage,
   }))
 );
+const OwnerInvoiceTemplateLazy = lazy(() =>
+  import("@/pages/owner/InvoiceTemplateSettings").then((m) => ({
+    default: m.InvoiceTemplateSettings,
+  }))
+);
 const AdminDashboardLazy = lazy(() =>
   import("@/pages/admin/AdminDashboard").then((m) => ({
     default: m.AdminDashboard,
@@ -124,6 +129,11 @@ const EmployeeDetailsLazy = lazy(() =>
 const OfficeLocationPageLazy = lazy(() =>
   import("@/pages/admin/OfficeLocation").then((m) => ({
     default: m.OfficeLocationPage,
+  }))
+);
+const AdminSupportTicketsLazy = lazy(() =>
+  import("@/pages/admin/SupportTickets").then((m) => ({
+    default: m.AdminSupportTickets,
   }))
 );
 const EmployeeDashboardLazy = lazy(() =>
@@ -223,6 +233,10 @@ const App = () => (
                     path="leave-allocation"
                     element={<LeaveAllocationLazy />}
                   />
+                  <Route
+                    path="support-tickets"
+                    element={<AdminSupportTicketsLazy />}
+                  />
                 </Route>
 
                 <Route
@@ -251,6 +265,7 @@ const App = () => (
                   <Route path="plans" element={<OwnerPlansLazy />} />
                   <Route path="support" element={<OwnerSupportLazy />} />
                   <Route path="settings" element={<OwnerSettingsLazy />} />
+                  <Route path="settings/invoice-template" element={<OwnerInvoiceTemplateLazy />} />
                 </Route>
 
                 <Route

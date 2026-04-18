@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useAppSelector } from "@/hooks/useAppSelector";
+import { createCompany } from "@/services/api/ownerApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,6 @@ const companySchema = z.object({
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 export const CreateCompany = () => {
-  useAppSelector((state) => state.auth);
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -95,17 +94,37 @@ export const CreateCompany = () => {
 
   const onSubmit = async (data: CompanyFormValues) => {
     setSubmitting(true);
-    // UI only implementation as requested
-    console.log("Form Data:", { ...data, logo: logoPreview });
     
-    setTimeout(() => {
-      toast({
-        title: "Success!",
-        description: `${data.companyName} and its administrator have been successfully registered (UI Mock).`,
+    try {
+      const response = await createCompany({
+        companyName: data.companyName,
+        domain: data.domain || "",
+        industry: data.industry || "",
+        registrationDate: data.registrationDate,
+        status: data.status,
+        adminName: data.adminName,
+        adminEmail: data.adminEmail,
+        adminPassword: data.adminPassword,
+        plan: "free", // Can be enhanced to select plan
       });
+
+      if (response.success) {
+        toast({
+          title: "Success!",
+          description: `${data.companyName} and its administrator have been successfully registered.`,
+        });
+        navigate("/owner/companies");
+      }
+    } catch (error: any) {
+      console.error("Error creating company:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create company",
+        variant: "destructive",
+      });
+    } finally {
       setSubmitting(false);
-      navigate("/owner/companies");
-    }, 1500);
+    }
   };
 
   return (

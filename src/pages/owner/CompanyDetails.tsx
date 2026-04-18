@@ -20,8 +20,10 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
+import { getCompanyById, updateCompany, updateCompanySubscription } from "@/services/api/ownerApi";
 
 interface CompanyDetails {
   _id: string;
@@ -42,6 +44,7 @@ interface CompanyDetails {
 const PRICING_PLANS = [
   {
     name: "Free Trial",
+    key: "free",
     durationDays: 15,
     maxEmployees: 25,
     basePrice: 0,
@@ -50,6 +53,7 @@ const PRICING_PLANS = [
   },
   {
     name: "Pro Plan",
+    key: "pro",
     maxEmployees: 50,
     basePrice: 999,
     extraEmployeePrice: 20,
@@ -57,6 +61,7 @@ const PRICING_PLANS = [
   },
   {
     name: "Premium Plan",
+    key: "premium",
     maxEmployees: 100,
     basePrice: 1999,
     extraEmployeePrice: 15,
@@ -64,54 +69,68 @@ const PRICING_PLANS = [
   },
 ];
 
-const MOCK_COMPANY_DETAILS: Record<string, CompanyDetails> = {
-  "1": {
-    _id: "1",
-    name: "Acme International",
-    registrationDate: "2024-01-15",
-    domain: "acme-intl.com",
-    adminName: "John Doe",
-    email: "john@acme.com",
-    plan: "Premium Plan",
-    amount: 1999,
-    startDate: "2024-01-15",
-    renewalDate: "2025-01-15",
-    daysLeft: 300,
-    status: "Active",
-    employeeCount: 245,
-  },
-  "2": {
-    _id: "2",
-    name: "Globex Corp",
-    registrationDate: "2024-02-10",
-    domain: "globex.io",
-    adminName: "Jane Smith",
-    email: "jane@globex.io",
-    plan: "Pro Plan",
-    amount: 999,
-    startDate: "2024-02-10",
-    renewalDate: "2025-02-10",
-    daysLeft: 326,
-    status: "Active",
-    employeeCount: 128,
-  },
-};
-
 export const CompanyDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [company, setCompany] = useState<CompanyDetails | null>(null);
   const [editMode, setEditMode] = useState<"none" | "profile" | "renewal">("none");
   const [editForm, setEditForm] = useState<CompanyDetails | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // Simulate API fetch
-    const data = id && MOCK_COMPANY_DETAILS[id] ? MOCK_COMPANY_DETAILS[id] : MOCK_COMPANY_DETAILS["1"];
-    setCompany(data);
-    setEditForm(data);
+    if (id) {
+      fetchCompany();
+    }
   }, [id]);
 
-  if (!company) return <div className="p-8 text-center">Loading...</div>;
+  const fetchCompany = async () => {
+    try {
+      setLoading(true);
+      const response = await getCompanyById(id!);
+      if (response.success) {
+        const data: any = response.data;
+        const companyData: CompanyDetails = {
+          _id: data._id,
+          name: data.name,
+          registrationDate: data.registrationDate || data.createdAt,
+          domain: data.domain || "",
+          adminName: data.adminName || "",
+          email: data.email || "",
+          plan: data.subscription?.plan || "free",
+          amount: data.subscription?.amount || 0,
+          startDate: data.subscription?.startDate || data.createdAt,
+          renewalDate: data.subscription?.renewalDate || data.createdAt,
+          daysLeft: data.daysLeft || 0,
+          status: data.status === "active" ? "Active" : "Inactive",
+          employeeCount: data.employeeCount || 0,
+        };
+        setCompany(companyData);
+        setEditForm(companyData);
+      }
+    } catch (error: any) {
+      console.error("Error fetching company:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load company details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!company) {
+    return <div className="p-8 text-center">Company not found</div>;
+  }
 
   const handleEditProfile = () => {
     setEditMode("profile");
@@ -121,11 +140,11 @@ export const CompanyDetails = () => {
     setEditMode("renewal");
   };
 
-  const calculateAmount = (planName: string, employeeCount: number) => {
-    const selectedPlan = PRICING_PLANS.find(p => p.name === planName);
+  const calculateAmount = (planKey: string, employeeCount: number) => {
+    const selectedPlan = PRICING_PLANS.find(p => p.key === planKey);
     if (!selectedPlan) return 0;
 
-    if (selectedPlan.name === "Free Trial") return 0;
+    if (selectedPlan.key === "free") return 0;
 
     let total = selectedPlan.basePrice;
     if (employeeCount > selectedPlan.maxEmployees) {
@@ -140,16 +159,50 @@ export const CompanyDetails = () => {
     setEditForm(company);
   };
 
-  const handleSave = () => {
-    if (editForm) {
-      setCompany(editForm);
-      setEditMode("none");
+  const handleSave = async () => {
+    if (!editForm || !id) return;
+    
+    setSubmitting(true);
+    try {
+      if (editMode === "profile") {
+        const response = await updateCompany(id, {
+          name: editForm.name,
+          domain: editForm.domain,
+          status: editForm.status.toLowerCase(),
+        });
+        
+        if (response.success) {
+          toast({
+            title: "Success",
+            description: "Profile details updated successfully.",
+          });
+          fetchCompany();
+          setEditMode("none");
+        }
+      } else if (editMode === "renewal") {
+        const planKey = editForm.plan.toLowerCase();
+        const response = await updateCompanySubscription(id, {
+          plan: planKey,
+          employeeCount: editForm.employeeCount,
+        });
+        
+        if (response.success) {
+          toast({
+            title: "Success",
+            description: "Subscription updated successfully.",
+          });
+          fetchCompany();
+          setEditMode("none");
+        }
+      }
+    } catch (error: any) {
       toast({
-        title: "Success",
-        description: editMode === "profile" 
-          ? "Profile details updated successfully." 
-          : "Subscription details updated successfully.",
+        title: "Error",
+        description: error.message || "Failed to save changes",
+        variant: "destructive",
       });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -188,12 +241,12 @@ export const CompanyDetails = () => {
         <div className="flex items-center gap-3">
           {editMode !== "none" ? (
             <>
-              <Button variant="outline" onClick={handleCancel} className="gap-2 px-6">
+              <Button variant="outline" onClick={handleCancel} className="gap-2 px-6" disabled={submitting}>
                 <X className="h-4 w-4" />
                 Cancel
               </Button>
-              <Button onClick={handleSave} className="gap-2 px-6 shadow-md shadow-primary/20">
-                <Save className="h-4 w-4" />
+              <Button onClick={handleSave} className="gap-2 px-6 shadow-md shadow-primary/20" disabled={submitting}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Changes
               </Button>
             </>
@@ -227,18 +280,18 @@ export const CompanyDetails = () => {
         </Card>
         <Card className="border-none shadow-sm bg-card/50 backdrop-blur-sm">
           <CardContent className="p-6 flex items-center gap-4">
-            <div className={`p-3 rounded-xl ${company.employeeCount > (PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees || 0) ? "bg-amber-500/10 text-amber-600" : "bg-primary/10 text-primary"}`}>
+            <div className={`p-3 rounded-xl ${company.employeeCount > (PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees || 0) ? "bg-amber-500/10 text-amber-600" : "bg-primary/10 text-primary"}`}>
               <Users className="h-6 w-6" />
             </div>
             <div className="flex-1">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Employees</p>
               <div className="flex items-baseline gap-2">
                 <p className="text-xl font-bold">{company.employeeCount.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground">/ {PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees} included</p>
+                <p className="text-xs text-muted-foreground">/ {PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees} included</p>
               </div>
-              {company.employeeCount > (PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees || 0) && (
+              {company.employeeCount > (PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees || 0) && (
                 <p className="text-[10px] text-amber-600 font-bold mt-0.5">
-                  +{company.employeeCount - (PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees || 0)} extra charged
+                  +{company.employeeCount - (PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees || 0)} extra charged
                 </p>
               )}
             </div>
@@ -263,7 +316,7 @@ export const CompanyDetails = () => {
             </div>
             <div>
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Reg. Date</p>
-              <p className="text-xl font-bold">{company.registrationDate}</p>
+              <p className="text-xl font-bold">{new Date(company.registrationDate).toLocaleDateString()}</p>
             </div>
           </CardContent>
         </Card>
@@ -384,7 +437,7 @@ export const CompanyDetails = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {PRICING_PLANS.map(p => (
-                          <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+                          <SelectItem key={p.key} value={p.key}>{p.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -394,7 +447,7 @@ export const CompanyDetails = () => {
                         {company.plan}
                       </Badge>
                       <div className="text-[10px] text-muted-foreground italic">
-                        {PRICING_PLANS.find(p => p.name === company.plan)?.features.join(" • ")}
+                        {PRICING_PLANS.find(p => p.key === company.plan)?.features.join(" • ")}
                       </div>
                     </div>
                   )}
@@ -440,12 +493,12 @@ export const CompanyDetails = () => {
                       <div className="flex flex-col text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <CheckCircle2 className="h-2.5 w-2.5 text-emerald-500" />
-                          {PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees} included in plan
+                          {PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees} included in plan
                         </span>
-                        {company.employeeCount > (PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees || 0) && (
+                        {company.employeeCount > (PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees || 0) && (
                           <span className="flex items-center gap-1 text-amber-600 font-bold mt-0.5">
                             <AlertCircle className="h-2.5 w-2.5" />
-                            {company.employeeCount - (PRICING_PLANS.find(p => p.name === company.plan)?.maxEmployees || 0)} extra employees
+                            {company.employeeCount - (PRICING_PLANS.find(p => p.key === company.plan)?.maxEmployees || 0)} extra employees
                           </span>
                         )}
                       </div>
@@ -461,9 +514,9 @@ export const CompanyDetails = () => {
                     <Label className="text-xs font-semibold uppercase">Activation Date</Label>
                   </div>
                   {editMode === "renewal" ? (
-                    <Input type="date" value={editForm?.startDate} onChange={(e) => setEditForm(prev => prev ? {...prev, startDate: e.target.value} : null)} className="bg-background/50" />
+                    <Input type="date" value={editForm?.startDate?.split('T')[0]} onChange={(e) => setEditForm(prev => prev ? {...prev, startDate: e.target.value} : null)} className="bg-background/50" />
                   ) : (
-                    <p className="text-lg font-medium">{company.startDate}</p>
+                    <p className="text-lg font-medium">{new Date(company.startDate).toLocaleDateString()}</p>
                   )}
                 </div>
                 <div className="space-y-3">
@@ -472,10 +525,10 @@ export const CompanyDetails = () => {
                     <Label className="text-xs font-semibold uppercase">Renewal Deadline</Label>
                   </div>
                   {editMode === "renewal" ? (
-                    <Input type="date" value={editForm?.renewalDate} onChange={(e) => setEditForm(prev => prev ? {...prev, renewalDate: e.target.value} : null)} className="bg-background/50" />
+                    <Input type="date" value={editForm?.renewalDate?.split('T')[0]} onChange={(e) => setEditForm(prev => prev ? {...prev, renewalDate: e.target.value} : null)} className="bg-background/50" />
                   ) : (
                     <div className="space-y-1">
-                      <p className="text-lg font-medium">{company.renewalDate}</p>
+                      <p className="text-lg font-medium">{new Date(company.renewalDate).toLocaleDateString()}</p>
                       <p className={`text-xs font-bold px-2 py-0.5 rounded w-fit ${company.daysLeft < 30 ? "bg-rose-500/10 text-rose-600" : "bg-blue-500/10 text-blue-600"}`}>
                         {company.daysLeft} days remaining
                       </p>

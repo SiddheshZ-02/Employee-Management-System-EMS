@@ -40,6 +40,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { getSupportAnalytics } from '@/services/api/ownerApi';
 
 const adminNavItems = [
   {
@@ -149,6 +150,7 @@ export function AppSidebar() {
   const navigate = useNavigate();
 
   const [pendingLeaves, setPendingLeaves] = useState<number | null>(null);
+  const [openTickets, setOpenTickets] = useState<number | null>(null);
 
   useEffect(() => {
     if (!token || user?.role !== 'Admin') {
@@ -201,6 +203,44 @@ export function AppSidebar() {
     };
   }, [token, user?.role]);
 
+  useEffect(() => {
+    if (!token || user?.role !== 'Owner') {
+      setOpenTickets(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const fetchOpenTickets = async () => {
+      try {
+        const response = await getSupportAnalytics();
+        
+        if (!cancelled && response.success) {
+          setOpenTickets(response.data.openTickets);
+        }
+      } catch {
+        if (!cancelled) {
+          setOpenTickets(null);
+        }
+      }
+    };
+
+    fetchOpenTickets();
+    const interval = setInterval(fetchOpenTickets, 60000);
+
+    const handleTicketResolved = () => {
+      fetchOpenTickets();
+    };
+
+    window.addEventListener('ticketResolved', handleTicketResolved);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      window.removeEventListener('ticketResolved', handleTicketResolved);
+    };
+  }, [token, user?.role]);
+
   const navItems =
     user?.role === 'Admin'
       ? adminNavItems
@@ -248,7 +288,9 @@ export function AppSidebar() {
                 {navItems.map((item) => {
                   const isActive = location.pathname === item.url;
                   const isLeaveRequests = item.title === 'Leave Requests';
-                  const showBadge = isLeaveRequests && pendingLeaves !== null && pendingLeaves > 0;
+                  const isSupport = item.title === 'Support';
+                  const showLeaveBadge = isLeaveRequests && pendingLeaves !== null && pendingLeaves > 0;
+                  const showTicketBadge = isSupport && openTickets !== null && openTickets > 0;
 
                   const menuItem = (
                     <SidebarMenuItem key={item.title}>
@@ -274,9 +316,14 @@ export function AppSidebar() {
                               </span>
                               
                               <div className="flex items-center gap-2">
-                                {showBadge && (
+                                {showLeaveBadge && (
                                   <span className="inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold px-1.5 animate-pulse shadow-sm shadow-destructive/20">
                                     {pendingLeaves > 99 ? '99+' : pendingLeaves}
+                                  </span>
+                                )}
+                                {showTicketBadge && (
+                                  <span className="inline-flex items-center justify-center h-5 min-w-[20px] rounded-full bg-amber-500 text-white text-[10px] font-bold px-1.5 animate-pulse shadow-sm shadow-amber-500/20">
+                                    {openTickets > 99 ? '99+' : openTickets}
                                   </span>
                                 )}
                                 {isActive && (
@@ -302,7 +349,8 @@ export function AppSidebar() {
                         </TooltipTrigger>
                         <TooltipContent side="right" sideOffset={10} className="font-semibold text-xs">
                           {item.title}
-                          {showBadge && ` (${pendingLeaves} pending)`}
+                          {showLeaveBadge && ` (${pendingLeaves} pending)`}
+                          {showTicketBadge && ` (${openTickets} open)`}
                         </TooltipContent>
                       </Tooltip>
                     );

@@ -10,7 +10,8 @@ import {
   CalendarDays, 
   Settings2, 
   ChevronRight,
-  CalendarCheck
+  CalendarCheck,
+  MessageSquare
 } from "lucide-react";
 
 export const AdminAccess = () => {
@@ -37,6 +38,13 @@ export const AdminAccess = () => {
       icon: <CalendarCheck className="h-6 w-6 text-primary" />,
       path: "/admin/leave-allocation",
       color: "bg-green-500/50",
+    },
+    {
+      title: "Support Tickets",
+      description: "Raise and track issues with the platform to get help.",
+      icon: <MessageSquare className="h-6 w-6 text-primary" />,
+      path: "/admin/support-tickets",
+      color: "bg-orange-500/50",
     },
   ];
 

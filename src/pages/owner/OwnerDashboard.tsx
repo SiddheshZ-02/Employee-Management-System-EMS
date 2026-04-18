@@ -1,42 +1,12 @@
-import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell
-} from "recharts";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-
-// ─── MOCK DATA ────────────────────────────────────────────────────────────────
-const revenueData = [
-  { month: "Aug", revenue: 48000, new: 12000 },
-  { month: "Sep", revenue: 55000, new: 18000 },
-  { month: "Oct", revenue: 61000, new: 14000 },
-  { month: "Nov", revenue: 58000, new: 9000 },
-  { month: "Dec", revenue: 72000, new: 21000 },
-  { month: "Jan", revenue: 88000, new: 27000 },
-  { month: "Feb", revenue: 95000, new: 19000 },
-  { month: "Mar", revenue: 112000, new: 33000 },
-];
-
-const planData = [
-  { name: "Basic", value: 38, color: "#4ade80" },
-  { name: "Pro", value: 45, color: "#38bdf8" },
-  { name: "Enterprise", value: 17, color: "#a78bfa" },
-];
-
-const companies = [
-  { id: 1, name: "TechCorp Pvt Ltd", employees: 120, plan: "Pro", status: "Active" },
-  { id: 2, name: "Alpha Solutions", employees: 34, plan: "Basic", status: "Expired" },
-  { id: 3, name: "Nexus IT Services", employees: 450, plan: "Enterprise", status: "Active" },
-  { id: 4, name: "BlueSky Logistics", employees: 88, plan: "Pro", status: "Active" },
-];
-
-const activity = [
-  { type: "signup", text: "Nexus IT Services signed up — Enterprise Plan", time: "2 min ago" },
-  { type: "payment", text: "TechCorp Pvt Ltd renewed — ₹84,000 received", time: "1 hr ago" },
-  { type: "warning", text: "Alpha Solutions plan expired — 3 days overdue", time: "3 hrs ago" },
-  { type: "alert", text: "Spark Analytics suspended — payment failed", time: "Yesterday" },
-];
+import { getDashboardAnalytics, type DashboardAnalytics } from "@/services/api/ownerApi";
+import { toast } from "@/hooks/use-toast";
+import { Loader2, Ticket, AlertCircle, CheckCircle, Clock } from "lucide-react";
 
 // ─── COMPONENTS ────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, badge, badgePositive, accent, icon }: any) {
@@ -64,6 +34,63 @@ function KpiCard({ label, value, badge, badgePositive, accent, icon }: any) {
 }
 
 export const OwnerDashboard = () => {
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
+
+  useEffect(() => {
+    fetchDashboardData();
+    
+    const interval = setInterval(fetchDashboardData, 60000);
+    
+    const handleTicketResolved = () => {
+      fetchDashboardData();
+    };
+    
+    window.addEventListener('ticketResolved', handleTicketResolved);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('ticketResolved', handleTicketResolved);
+    };
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await getDashboardAnalytics();
+      if (response.success) {
+        setAnalytics(response.data);
+      }
+    } catch (error: any) {
+      console.error("Error fetching dashboard data:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!analytics) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground">No data available</p>
+      </div>
+    );
+  }
+
+  const openTicketsCount = analytics.summary.openTickets || 0;
+
   return (
     <div className="space-y-8 p-6 bg-background min-h-full text-foreground">
       <div>
@@ -72,11 +99,47 @@ export const OwnerDashboard = () => {
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard label="Monthly Revenue" value="₹1,12,000" badge="↑ 18% vs last month" badgePositive accent="linear-gradient(90deg,#38bdf8,#818cf8)" icon="💰" />
-        <KpiCard label="Total Companies" value="7" badge="↑ 2 new this month" badgePositive accent="linear-gradient(90deg,#4ade80,#22d3ee)" icon="🏢" />
-        <KpiCard label="Active Subscriptions" value="5" badge="2 expired / suspended" badgePositive={false} accent="linear-gradient(90deg,#a78bfa,#f472b6)" icon="📦" />
-        <KpiCard label="Total Employees" value="1,101" badge="Across all companies" badgePositive accent="linear-gradient(90deg,#fb923c,#f43f5e)" icon="👥" />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <KpiCard 
+          label="Monthly Revenue" 
+          value={`₹${analytics.summary.monthlyRecurringRevenue.toLocaleString()}`} 
+          badge="Updated in real-time" 
+          badgePositive 
+          accent="linear-gradient(90deg,#38bdf8,#818cf8)" 
+          icon="💰" 
+        />
+        <KpiCard 
+          label="Total Companies" 
+          value={analytics.summary.totalCompanies.toString()} 
+          badge={`${analytics.recentCompanies.length} new this month`} 
+          badgePositive 
+          accent="linear-gradient(90deg,#4ade80,#22d3ee)" 
+          icon="🏢" 
+        />
+        <KpiCard 
+          label="Active Subscriptions" 
+          value={analytics.summary.activeSubscriptions.toString()} 
+          badge={`${analytics.summary.expiredSubscriptions} expired`} 
+          badgePositive={analytics.summary.expiredSubscriptions === 0} 
+          accent="linear-gradient(90deg,#a78bfa,#f472b6)" 
+          icon="📦" 
+        />
+        <KpiCard 
+          label="Total Employees" 
+          value={analytics.summary.totalEmployees.toLocaleString()} 
+          badge="Across all companies" 
+          badgePositive 
+          accent="linear-gradient(90deg,#fb923c,#f43f5e)" 
+          icon="👥" 
+        />
+        <KpiCard 
+          label="Open Tickets" 
+          value={openTicketsCount.toString()} 
+          badge={openTicketsCount === 0 ? "All clear" : "Needs attention"} 
+          badgePositive={openTicketsCount === 0} 
+          accent="linear-gradient(90deg,#ef4444,#f97316)" 
+          icon="🎫" 
+        />
       </div>
 
       {/* Revenue Chart + Plan Distribution */}
@@ -88,7 +151,7 @@ export const OwnerDashboard = () => {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
-              <AreaChart data={revenueData}>
+              <AreaChart data={analytics.revenueData}>
                 <defs>
                   <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.25} />
@@ -121,14 +184,14 @@ export const OwnerDashboard = () => {
           <CardContent>
             <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={planData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={3}>
-                  {planData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                <Pie data={analytics.planDistribution} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value" paddingAngle={3}>
+                  {analytics.planDistribution.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip contentStyle={{ backgroundColor: "hsl(var(--card))", borderColor: "hsl(var(--border))", borderRadius: 10, color: "hsl(var(--card-foreground))", fontSize: 12 }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="flex flex-col gap-2 mt-4">
-              {planData.map(p => (
+              {analytics.planDistribution.map(p => (
                 <div key={p.name} className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-[2px]" style={{ background: p.color }} />
@@ -147,10 +210,10 @@ export const OwnerDashboard = () => {
         <Card className="bg-card border-border">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-bold">Recent Companies</CardTitle>
-            <Button variant="link" className="text-xs text-primary p-0 h-auto">View all →</Button>
+            <Button variant="link" className="text-xs text-primary p-0 h-auto" onClick={() => navigate('/owner/companies')}>View all →</Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {companies.map(c => (
+            {analytics.recentCompanies.map(c => (
               <div key={c.id} className="flex justify-between items-center py-2 border-b border-border/50 last:border-0">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#38bdf8] to-[#818cf8] flex items-center justify-center text-sm font-black text-white">
@@ -176,25 +239,69 @@ export const OwnerDashboard = () => {
         </Card>
 
         <Card className="bg-card border-border">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-bold">Recent Activity</CardTitle>
+            {analytics.recentActivity.some(a => a.type === 'ticket') && (
+              <Button variant="link" className="text-xs text-primary p-0 h-auto" onClick={() => navigate('/owner/support')}>View all tickets →</Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
-            {activity.map((a, i) => (
-              <div key={i} className="flex gap-3 py-2 border-b border-border/50 last:border-0">
-                <div 
-                  className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
-                    a.type === 'signup' ? 'bg-green-500' : 
-                    a.type === 'payment' ? 'bg-blue-500' : 
-                    a.type === 'warning' ? 'bg-orange-500' : 'bg-red-500'
-                  }`} 
-                />
-                <div className="flex-1">
-                  <div className="text-sm text-foreground leading-tight">{a.text}</div>
-                  <div className="text-[11px] text-muted-foreground mt-1">{a.time}</div>
-                </div>
+            {analytics.recentActivity.length === 0 ? (
+              <div className="text-center py-8">
+                <Ticket className="h-12 w-12 mx-auto text-muted-foreground/30 mb-3" />
+                <p className="text-sm text-muted-foreground">No recent activity</p>
               </div>
-            ))}
+            ) : (
+              analytics.recentActivity.map((a, i) => (
+                <div key={i} className="flex gap-3 py-2 border-b border-border/50 last:border-0">
+                  {a.type === 'ticket' ? (
+                    <>
+                      <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-orange-500" />
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="text-sm text-foreground leading-tight flex-1">{a.text}</div>
+                          <Badge 
+                            className={`text-[9px] font-bold rounded-full px-1.5 py-0 h-auto border-none ${
+                              a.priority === 'critical' ? 'bg-red-500/10 text-red-500' :
+                              a.priority === 'high' ? 'bg-orange-500/10 text-orange-500' :
+                              a.priority === 'medium' ? 'bg-yellow-500/10 text-yellow-500' :
+                              'bg-green-500/10 text-green-500'
+                            }`}
+                          >
+                            {a.priority}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[11px] text-muted-foreground">{a.time}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-[10px] h-auto p-0 text-primary hover:underline"
+                            onClick={() => navigate('/owner/support')}
+                          >
+                            View →
+                          </Button>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div 
+                        className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                          a.type === 'signup' ? 'bg-green-500' : 
+                          a.type === 'payment' ? 'bg-blue-500' : 
+                          a.type === 'warning' ? 'bg-orange-500' : 'bg-red-500'
+                        }`} 
+                      />
+                      <div className="flex-1">
+                        <div className="text-sm text-foreground leading-tight">{a.text}</div>
+                        <div className="text-[11px] text-muted-foreground mt-1">{a.time}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

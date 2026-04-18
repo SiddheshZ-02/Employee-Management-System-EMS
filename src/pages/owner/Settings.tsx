@@ -1,14 +1,29 @@
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useNavigate } from "react-router-dom";
+import { FileText } from "lucide-react";
 
 export const SettingsPage = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-8 p-6 bg-background min-h-full text-foreground">
       <div>
         <h1 className="text-3xl font-extrabold tracking-tight">Settings</h1>
         <p className="text-sm text-muted-foreground">Manage your platform and account preferences</p>
       </div>
+
+      {/* Quick Links */}
+      <Card className="bg-card border-border p-6 cursor-pointer hover:border-primary/50 transition-colors" onClick={() => navigate('/owner/settings/invoice-template')}>
+        <CardHeader className="px-0 pt-0 pb-4">
+          <CardTitle className="text-sm font-bold flex items-center gap-2">
+            <FileText className="h-5 w-5 text-primary" />
+            Invoice Template Settings
+          </CardTitle>
+        </CardHeader>
+        <p className="text-xs text-muted-foreground">Customize your invoice design, add logo, signature, and payment details</p>
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="bg-card border-border p-6">
