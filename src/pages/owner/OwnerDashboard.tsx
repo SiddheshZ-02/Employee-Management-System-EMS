@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDashboardAnalytics, type DashboardAnalytics } from "@/services/api/ownerApi";
 import { toast } from "@/hooks/use-toast";
-import { Loader2, Ticket, AlertCircle, CheckCircle, Clock } from "lucide-react";
+import { Loader2, Ticket } from "lucide-react";
 
 // ─── COMPONENTS ────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, badge, badgePositive, accent, icon }: any) {

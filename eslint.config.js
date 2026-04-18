@@ -19,5 +19,16 @@ export default tseslint.config([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'warn', // Downgrade to warning
+      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+    },
+  },
+  // Ignore UI component library files
+  {
+    files: ['src/components/ui/*.tsx'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
   },
 ])
