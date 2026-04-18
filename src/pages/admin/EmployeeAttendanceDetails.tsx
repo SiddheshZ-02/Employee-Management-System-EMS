@@ -114,6 +114,12 @@ interface LeaveRecord {
   status: string;
 }
 
+interface HolidayRecord {
+  _id: string;
+  name: string;
+  date: string;
+}
+
 export const EmployeeAttendanceDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -125,6 +131,7 @@ export const EmployeeAttendanceDetails = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
+  const [holidays, setHolidays] = useState<HolidayRecord[]>([]);
 
   // Leave allocation states
   const [leaveTypes, setLeaveTypes] = useState<LeaveType[]>([]);
@@ -376,6 +383,20 @@ export const EmployeeAttendanceDetails = () => {
     }
 
     try {
+      const holidayRes = await fetch(`${API_BASE_URL}/api/holidays`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (holidayRes.ok) {
+        const holidayJson = await holidayRes.json();
+        if (holidayJson.success && Array.isArray(holidayJson.holidays)) {
+          setHolidays(holidayJson.holidays);
+        }
+      }
+    } catch (err) {
+      console.error("Holiday fetch error:", err);
+    }
+
+    try {
       const leaveParams = new URLSearchParams();
       leaveParams.append("status", "approved");
       leaveParams.append("userId", String(id));
@@ -465,6 +486,14 @@ export const EmployeeAttendanceDetails = () => {
       }
     });
 
+    const holidayDates = new Map<string, string>();
+    holidays.forEach((h) => {
+      if (h.date) {
+        const dateStr = h.date.split("T")[0];
+        holidayDates.set(dateStr, h.name);
+      }
+    });
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -472,6 +501,7 @@ export const EmployeeAttendanceDetails = () => {
     let leave = 0;
     let absent = 0;
     let weekOff = 0;
+    let holidayDaysCount = 0;
 
     const cursor = new Date(start);
     while (cursor <= end) {
@@ -480,6 +510,8 @@ export const EmployeeAttendanceDetails = () => {
       
       if (attendanceByDate.has(key)) {
         present += 1;
+      } else if (holidayDates.has(key)) {
+        holidayDaysCount += 1;
       } else if (day === 0 || day === 6) {
         weekOff += 1;
       } else if (leaveDates.has(key)) {
@@ -517,9 +549,10 @@ export const EmployeeAttendanceDetails = () => {
       leaveDays: leave,
       absentDays: absent,
       weekOffDays: weekOff,
+      holidayDays: holidayDaysCount,
       totalWorkingHoursLabel,
     };
-  }, [attendanceRecords, leaveRecords, startDate, endDate]);
+  }, [attendanceRecords, leaveRecords, startDate, endDate, holidays]);
 
   const formattedAttendanceRows = useMemo(() => {
     if (!startDate || !endDate) {
@@ -612,6 +645,14 @@ export const EmployeeAttendanceDetails = () => {
       }
     });
 
+    const holidayDates = new Map<string, string>();
+    holidays.forEach((h) => {
+      if (h.date) {
+        const dateStr = h.date.split("T")[0];
+        holidayDates.set(dateStr, h.name);
+      }
+    });
+
     const rows: {
       id: string;
       dateLabel: string;
@@ -630,6 +671,7 @@ export const EmployeeAttendanceDetails = () => {
       const key = format(cursor, "yyyy-MM-dd");
       const day = cursor.getDay();
       const record = attendanceByDate.get(key);
+      const holidayName = holidayDates.get(key);
 
       if (record) {
         const dateLabel = key; // date is already YYYY-MM-DD
@@ -692,8 +734,16 @@ export const EmployeeAttendanceDetails = () => {
       } else {
         const dateLabel = format(cursor, "yyyy-MM-dd");
         let status: DayStatus = "Absent";
-        if (day === 0 || day === 6) status = "Week Off";
-        else if (leaveDates.has(key)) status = "Leave";
+        let workMode = "-";
+
+        if (holidayName) {
+          status = "Holiday";
+          workMode = holidayName;
+        } else if (day === 0 || day === 6) {
+          status = "Week Off";
+        } else if (leaveDates.has(key)) {
+          status = "Leave";
+        }
 
         rows.push({
           id: key,
@@ -701,7 +751,7 @@ export const EmployeeAttendanceDetails = () => {
           checkIn: "-",
           checkOut: "-",
           totalHours: "0h 0m",
-          workMode: "-",
+          workMode,
           status,
         });
       }
@@ -711,7 +761,7 @@ export const EmployeeAttendanceDetails = () => {
 
     // Sort to show latest data on top
     return rows.sort((a, b) => b.dateLabel.localeCompare(a.dateLabel));
-  }, [attendanceRecords, leaveRecords, startDate, endDate]);
+  }, [attendanceRecords, leaveRecords, startDate, endDate, holidays]);
 
   const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -851,7 +901,7 @@ export const EmployeeAttendanceDetails = () => {
 
       
 
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
             <Card className="border shadow-sm bg-card overflow-hidden relative">
               <div className="absolute top-0 left-0 w-1 h-full bg-green-500" />
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -873,6 +923,18 @@ export const EmployeeAttendanceDetails = () => {
               <CardContent>
                 <div className="text-2xl font-bold">{dayCounts.absentDays}</div>
                 <p className="text-xs text-muted-foreground mt-1">Days not marked</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border shadow-sm bg-card overflow-hidden relative">
+              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500" />
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Holidays</CardTitle>
+                <Calendar className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{dayCounts.holidayDays || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Public holidays</p>
               </CardContent>
             </Card>
 
@@ -1075,14 +1137,27 @@ export const EmployeeAttendanceDetails = () => {
                             </span>
                           </TableCell>
                           <TableCell className="text-muted-foreground text-center">
-                            {row.workMode === "Office" ? (
-                              <Badge variant="outline" className="font-normal">Office</Badge>
-                            ) : row.workMode === "WFH" ? (
-                              <Badge variant="outline" className="font-normal">Remote</Badge>
-                            ) : (
-                              <span className="opacity-60">{row.workMode}</span>
-                            )}
-                          </TableCell>
+                        {row.workMode === "Office" ? (
+                          <Badge variant="outline" className="font-normal">Office</Badge>
+                        ) : row.workMode === "WFH" ? (
+                          <Badge variant="outline" className="font-normal">Remote</Badge>
+                        ) : row.status === "Holiday" ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20 font-normal cursor-help">
+                                  Holiday
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{row.workMode}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : (
+                          <span className="opacity-60">{row.workMode}</span>
+                        )}
+                      </TableCell>
                           <TableCell className="text-center">
                             {getStatusBadge(row.status)}
                           </TableCell>

@@ -640,6 +640,19 @@ const AttendanceTracking = () => {
                           <Badge variant="outline" className="font-normal">Office</Badge>
                         ) : row.workMode === "WFH" ? (
                           <Badge variant="outline" className="font-normal">Remote</Badge>
+                        ) : row.status === "Holiday" ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className="bg-blue-500/10 text-blue-500 border-blue-500/20 hover:bg-blue-500/20 font-normal cursor-help">
+                                  Holiday
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="text-xs">{row.workMode}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : (
                           <span className="opacity-60">{row.workMode}</span>
                         )}
