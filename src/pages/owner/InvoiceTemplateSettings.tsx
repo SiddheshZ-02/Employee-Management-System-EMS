@@ -73,7 +73,7 @@ export const InvoiceTemplateSettings = () => {
     } catch (error: any) {
       console.error("Error fetching template:", error);
       // If no template exists, use default
-      if (error.response?.status === 404) {
+      if (error.message?.includes("No invoice template found") || error.message?.includes("404")) {
         setTemplate(DEFAULT_TEMPLATE);
       }
     } finally {

@@ -1,4 +1,5 @@
 import { apiRequest } from "@/lib/api";
+import { API_BASE_URL } from "@/constant/Config";
 
 // ═══════════════════════════════════════════════════════════
 // Types
@@ -427,7 +428,7 @@ export const downloadInvoicePDF = async (
 ): Promise<void> => {
   const token = getToken();
   
-  const response = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000"}/api/owner/billing/invoices/${invoiceId}/download`, {
+  const response = await fetch(`${API_BASE_URL}/api/owner/billing/invoices/${invoiceId}/download`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -496,7 +497,7 @@ export const uploadTemplateLogo = async (file: File): Promise<{
   const formData = new FormData();
   formData.append('logo', file);
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/owner/invoice-template/upload-logo`, {
+  const response = await fetch(`${API_BASE_URL}/api/owner/invoice-template/upload-logo`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
@@ -515,7 +516,7 @@ export const uploadTemplateSignature = async (file: File): Promise<{
   const formData = new FormData();
   formData.append('signature', file);
 
-  const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/owner/invoice-template/upload-signature`, {
+  const response = await fetch(`${API_BASE_URL}/api/owner/invoice-template/upload-signature`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
