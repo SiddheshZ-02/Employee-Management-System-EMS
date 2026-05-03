@@ -1140,7 +1140,7 @@ export const EmployeeAttendanceDetails = () => {
                         {row.workMode === "Office" ? (
                           <Badge variant="outline" className="font-normal">Office</Badge>
                         ) : row.workMode === "WFH" ? (
-                          <Badge variant="outline" className="font-normal">Remote</Badge>
+                          <Badge variant="outline" className="font-normal">WFH</Badge>
                         ) : row.status === "Holiday" ? (
                           <TooltipProvider>
                             <Tooltip>

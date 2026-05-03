@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { format, parseISO } from "date-fns";
 import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
@@ -161,14 +162,12 @@ const AttendanceTracking = () => {
       const mapped: AttendanceRow[] = data.days.map((day) => {
         let checkInLabel = "-";
         if (day.checkInTime) {
-          const d = new Date(day.checkInTime);
-          checkInLabel = Number.isNaN(d.getTime())
-            ? day.checkInTime
-            : d.toLocaleTimeString("en-IN", {
-                hour12: true,
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+          try {
+            const d = parseISO(day.checkInTime);
+            checkInLabel = isNaN(d.getTime()) ? day.checkInTime : format(d, "hh:mm a");
+          } catch {
+            checkInLabel = day.checkInTime;
+          }
         }
 
         let checkOutLabel = "-";
@@ -184,14 +183,12 @@ const AttendanceTracking = () => {
           checkOutLabel = "-";
           totalLabel = "-"; // Don't show hours for incomplete sessions
         } else if (day.checkOutTime) {
-          const d = new Date(day.checkOutTime);
-          checkOutLabel = Number.isNaN(d.getTime())
-            ? day.checkOutTime
-            : d.toLocaleTimeString("en-IN", {
-                hour12: true,
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+          try {
+            const d = parseISO(day.checkOutTime);
+            checkOutLabel = isNaN(d.getTime()) ? day.checkOutTime : format(d, "hh:mm a");
+          } catch {
+            checkOutLabel = day.checkOutTime;
+          }
 
           // Only show hours if session is complete
           if (typeof day.workingHours === "number" && day.workingHours > 0) {
@@ -639,7 +636,7 @@ const AttendanceTracking = () => {
                         {row.workMode === "Office" ? (
                           <Badge variant="outline" className="font-normal">Office</Badge>
                         ) : row.workMode === "WFH" ? (
-                          <Badge variant="outline" className="font-normal">Remote</Badge>
+                          <Badge variant="outline" className="font-normal">WFH</Badge>
                         ) : row.status === "Holiday" ? (
                           <TooltipProvider>
                             <Tooltip>
