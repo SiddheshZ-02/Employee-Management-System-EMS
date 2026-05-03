@@ -370,7 +370,7 @@ export function AppSidebar() {
           )}>
             <div className="relative group cursor-pointer">
               <Avatar className="h-9 w-9 border-2 border-background shadow-sm transition-transform group-hover:scale-105">
-                <AvatarImage src="" />
+                <AvatarImage src={user?.profilePicture ? `${API_BASE_URL}/${user.profilePicture}` : ""} />
                 <AvatarFallback className="bg-primary/10 text-primary text-xs font-bold">
                   {user?.name ? getUserInitials(user.name) : 'U'}
                 </AvatarFallback>

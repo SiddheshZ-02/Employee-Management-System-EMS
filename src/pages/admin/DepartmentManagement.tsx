@@ -105,7 +105,7 @@ export const DepartmentManagement = () => {
         id: String(dept._id),
         name: String(dept.name),
         description: String(dept.description),
-        manager: String(dept.manager),
+        manager: dept.manager ? String(dept.manager) : "Not Assigned",
         employeeCount: typeof dept.employeeCount === "number" ? dept.employeeCount : 0,
         status: dept.status === "Inactive" ? "Inactive" : "Active",
       }));
@@ -175,9 +175,13 @@ export const DepartmentManagement = () => {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
-    manager: "",
+    manager: "Not Assigned",
 
     status: "Active" as "Active" | "Inactive",
+  });
+  const [errors, setErrors] = useState({
+    name: "",
+    description: "",
   });
 
   const filteredDepartments = departments.filter(
@@ -203,9 +207,13 @@ export const DepartmentManagement = () => {
     setFormData({
       name: "",
       description: "",
-      manager: "",
+      manager: "Not Assigned",
 
       status: "Active",
+    });
+    setErrors({
+      name: "",
+      description: "",
     });
     setEditingDepartment(null);
   };
@@ -224,14 +232,36 @@ export const DepartmentManagement = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.description) {
+    
+    // Reset errors
+    const newErrors = {
+      name: "",
+      description: "",
+    };
+    let hasError = false;
+
+    if (!formData.name.trim()) {
+      newErrors.name = "Department name is required";
+      hasError = true;
+    }
+    if (!formData.description.trim()) {
+      newErrors.description = "Description is required";
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrors(newErrors);
       toast({
         title: "Validation Error",
-        description: "Please fill in department name and description",
+        description: "Please correct the errors in the form",
         variant: "destructive",
       });
       return;
     }
+    
+    // Normalize manager value: if "Not Assigned", send empty string or handle as null
+    const managerValue = formData.manager === "Not Assigned" ? "" : formData.manager;
+
     if (editingDepartment) {
       try {
         if (!token) {
@@ -254,7 +284,7 @@ export const DepartmentManagement = () => {
             body: JSON.stringify({
               name: formData.name,
               description: formData.description,
-              manager: formData.manager,
+              manager: managerValue,
               status: formData.status,
             }),
           }
@@ -303,7 +333,7 @@ export const DepartmentManagement = () => {
             body: JSON.stringify({
               name: formData.name,
               description: formData.description,
-              manager: formData.manager,
+              manager: managerValue,
               status: formData.status,
             }),
           }
@@ -437,30 +467,48 @@ export const DepartmentManagement = () => {
                     <form onSubmit={handleSubmit}>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="name">Department Name</Label>
+                          <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>
+                            Department Name
+                          </Label>
                           <Input
                             id="name"
                             value={formData.name}
-                            onChange={(e) =>
-                              setFormData({ ...formData, name: e.target.value })
-                            }
+                            onChange={(e) => {
+                              setFormData({ ...formData, name: e.target.value });
+                              if (errors.name) setErrors({ ...errors, name: "" });
+                            }}
                             placeholder="e.g., Engineering"
+                            className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""}
                           />
+                          {errors.name && (
+                            <p className="text-xs text-destructive font-medium">
+                              {errors.name}
+                            </p>
+                          )}
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="description">Description</Label>
+                          <Label htmlFor="description" className={errors.description ? "text-destructive" : ""}>
+                            Description
+                          </Label>
                           <Textarea
                             id="description"
                             value={formData.description}
-                            onChange={(e) =>
+                            onChange={(e) => {
                               setFormData({
                                 ...formData,
                                 description: e.target.value,
-                              })
-                            }
+                              });
+                              if (errors.description) setErrors({ ...errors, description: "" });
+                            }}
                             placeholder="Brief description of the department"
                             rows={3}
+                            className={errors.description ? "border-destructive focus-visible:ring-destructive" : ""}
                           />
+                          {errors.description && (
+                            <p className="text-xs text-destructive font-medium">
+                              {errors.description}
+                            </p>
+                          )}
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="manager">Department Manager</Label>
@@ -474,6 +522,7 @@ export const DepartmentManagement = () => {
                               <SelectValue placeholder="Select manager" />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="Not Assigned">Not Assigned</SelectItem>
                               {employeeNames.map((name) => (
                                 <SelectItem key={name} value={name}>
                                   {name}
@@ -572,7 +621,9 @@ export const DepartmentManagement = () => {
                           </div>
                         </TableCell>
                         <TableCell className="hidden sm:table-cell text-center">
-                          <div className="truncate">{department.manager}</div>
+                          <div className={`truncate ${department.manager === "Not Assigned" ? "text-muted-foreground italic" : ""}`}>
+                            {department.manager}
+                          </div>
                         </TableCell>
                         <TableCell className="text-center">
                           <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted text-foreground text-xs font-semibold">

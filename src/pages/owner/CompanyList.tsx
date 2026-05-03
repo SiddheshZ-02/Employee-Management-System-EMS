@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Plus, Search, Trash2, MoreHorizontal, Loader2 } from "lucide-react";
+import { Eye, Plus, Search, Trash2, MoreHorizontal, Loader2, Power, ShieldAlert } from "lucide-react";
 import {
   Pagination,
   PaginationContent,
@@ -14,7 +14,15 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
-import { getCompanies, deleteCompany } from "@/services/api/ownerApi";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { getCompanies, deleteCompany, toggleCompanyStatus } from "@/services/api/ownerApi";
 import { toast } from "@/hooks/use-toast";
 
 const ITEMS_PER_PAGE = 5;
@@ -27,6 +35,14 @@ export const CompanyList = () => {
   const [loading, setLoading] = useState(true);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats] = useState({ total: 0, active: 0, expired: 0, suspended: 0 });
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const [statusToToggle, setStatusToToggle] = useState<{ id: string, name: string, currentStatus: string } | null>(null);
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -68,16 +84,23 @@ export const CompanyList = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this company?")) return;
+  const handleDelete = (id: string) => {
+    setDeleteId(id);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) return;
 
     try {
-      const response = await deleteCompany(id);
+      setIsDeleting(true);
+      const response = await deleteCompany(deleteId);
       if (response.success) {
         toast({
           title: "Success",
           description: "Company deleted successfully",
         });
+        setIsDeleteDialogOpen(false);
         fetchCompanies();
       }
     } catch (error: any) {
@@ -86,14 +109,58 @@ export const CompanyList = () => {
         description: error.message || "Failed to delete company",
         variant: "destructive",
       });
+    } finally {
+      setIsDeleting(false);
+      setDeleteId(null);
+    }
+  };
+
+  const handleStatusToggle = (company: any) => {
+    setStatusToToggle({
+      id: company._id,
+      name: company.name,
+      currentStatus: company.status || "active"
+    });
+    setIsStatusDialogOpen(true);
+  };
+
+  const confirmStatusToggle = async () => {
+    if (!statusToToggle) return;
+
+    try {
+      setIsUpdatingStatus(true);
+      const newStatus = statusToToggle.currentStatus === "active" ? "inactive" : "active";
+      const response = await toggleCompanyStatus(statusToToggle.id, newStatus);
+      if (response.success) {
+        toast({
+          title: "Success",
+          description: `Company ${newStatus === "active" ? "activated" : "deactivated"} successfully`,
+        });
+        setIsStatusDialogOpen(false);
+        fetchCompanies();
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update company status",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUpdatingStatus(false);
+      setStatusToToggle(null);
     }
   };
 
   const getBadgeStyle = (type: string) => {
     const map: any = {
       Active: "bg-green-500/10 text-green-500",
+      active: "bg-green-500/10 text-green-500",
       Expired: "bg-red-500/10 text-red-500",
+      expired: "bg-red-500/10 text-red-500",
       Suspended: "bg-orange-500/10 text-orange-500",
+      suspended: "bg-orange-500/10 text-orange-500",
+      Inactive: "bg-slate-500/10 text-slate-500",
+      inactive: "bg-slate-500/10 text-slate-500",
       basic: "bg-blue-500/10 text-blue-500",
       pro: "bg-purple-500/10 text-purple-500",
       premium: "bg-indigo-500/10 text-indigo-500",
@@ -204,10 +271,10 @@ export const CompanyList = () => {
                 </TableHeader>
                 <TableBody>
                   {companies.map(c => (
-                    <TableRow key={c._id} className="border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer group">
+                    <TableRow key={c._id} className={`border-b border-border/50 hover:bg-muted/50 transition-colors cursor-pointer group ${c.status === 'inactive' ? 'opacity-60' : ''}`}>
                       <TableCell className="px-4 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${c.status === 'inactive' ? 'bg-slate-500/10 text-slate-500' : 'bg-primary/10 text-primary'}`}>
                             {c.name[0]}
                           </div>
                           <div>
@@ -218,7 +285,7 @@ export const CompanyList = () => {
                       </TableCell>
                       <TableCell className="px-4"><Badge className={getBadgeStyle(c.subscription?.plan || "free")}>{c.subscription?.plan || "Free"}</Badge></TableCell>
                       <TableCell className="px-4 text-sm">{c.employeeCount || 0}</TableCell>
-                      <TableCell className="px-4"><Badge className={getBadgeStyle(formatStatus(c.subscription?.status || "trial"))}>{formatStatus(c.subscription?.status || "trial")}</Badge></TableCell>
+                      <TableCell className="px-4"><Badge className={getBadgeStyle(c.status || "active")}>{formatStatus(c.status || "active")}</Badge></TableCell>
                       <TableCell className="px-4 text-sm text-muted-foreground">{formatDate(c.createdAt)}</TableCell>
                       <TableCell className="px-4 text-sm text-muted-foreground">{c.subscription?.renewalDate ? formatDate(c.subscription.renewalDate) : "—"}</TableCell>
                       <TableCell className="px-4 text-sm font-bold text-green-500">₹{(c.subscription?.amount || 0).toLocaleString()}</TableCell>
@@ -235,17 +302,19 @@ export const CompanyList = () => {
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                            onClick={() => handleDelete(c._id)}
+                            className={`h-8 w-8 ${c.status === 'inactive' ? 'text-green-500 hover:text-green-600 hover:bg-green-500/10' : 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/10'}`}
+                            onClick={() => handleStatusToggle(c)}
+                            title={c.status === 'inactive' ? "Activate Company" : "Deactivate Company"}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            {c.status === 'inactive' ? <Power className="h-4 w-4" /> : <ShieldAlert className="h-4 w-4" />}
                           </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
-                            className="h-8 w-8 text-muted-foreground"
+                            className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                            onClick={() => handleDelete(c._id)}
                           >
-                            <MoreHorizontal className="h-4 w-4" />
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -293,6 +362,84 @@ export const CompanyList = () => {
           </>
         )}
       </Card>
+
+      {/* Status Toggle Modal */}
+      <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className={`text-xl font-bold ${statusToToggle?.currentStatus === 'active' ? 'text-amber-600' : 'text-green-600'}`}>
+              {statusToToggle?.currentStatus === 'active' ? 'Deactivate Company' : 'Activate Company'}
+            </DialogTitle>
+            <DialogDescription className="py-4">
+              {statusToToggle?.currentStatus === 'active' 
+                ? `Are you sure you want to deactivate ${statusToToggle?.name}? This will immediately block access for the Admin and all associated employees.`
+                : `Are you sure you want to activate ${statusToToggle?.name}? This will restore access for the Admin and all associated employees.`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsStatusDialogOpen(false)}
+              disabled={isUpdatingStatus}
+              className="font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={statusToToggle?.currentStatus === 'active' ? "destructive" : "default"}
+              onClick={confirmStatusToggle}
+              disabled={isUpdatingStatus}
+              className={`font-bold ${statusToToggle?.currentStatus === 'active' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+            >
+              {isUpdatingStatus ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                statusToToggle?.currentStatus === 'active' ? "Deactivate" : "Activate"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-red-600">Delete Company</DialogTitle>
+            <DialogDescription className="py-4">
+              Are you sure you want to delete this company? This action cannot be undone and all associated data will be permanently removed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="ghost"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isDeleting}
+              className="font-bold"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="font-bold bg-red-500 hover:bg-red-600"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Company"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,8 @@ import {
   ShieldCheck,
   CalendarDays,
   Loader2,
-  Edit3
+  Edit3,
+  Camera
 } from 'lucide-react';
 import { API_BASE_URL } from '@/constant/Config';
 
@@ -31,6 +32,7 @@ interface UserProfile {
   isActive?: boolean;
   createdAt?: string;
   lastLoginAt?: string;
+  profilePicture?: string;
 }
 
 export const ProfileManagement = () => {
@@ -40,6 +42,12 @@ export const ProfileManagement = () => {
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  
+  // Image Upload States
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -76,6 +84,14 @@ export const ProfileManagement = () => {
 
       if (data?.success && data?.data) {
         setProfileData(data.data);
+        // Update redux state to sync with sidebar and other components
+        dispatch(updateProfile({
+          profilePicture: data.data.profilePicture,
+          name: data.data.name,
+          email: data.data.email,
+          department: data.data.department,
+          phone: data.data.phone
+        }));
         setFormData({
           name: data.data.name || '',
           email: data.data.email || '',
@@ -104,10 +120,106 @@ export const ProfileManagement = () => {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [fetchProfile]);
+
+  useEffect(() => {
+    // Cleanup preview URL on unmount or when it changes
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   const handleEdit = () => {
     setIsEditing(true);
+  };
+
+  const handleImageClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please upload a JPEG, PNG or WebP image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB
+      toast({
+        title: "File too large",
+        description: "Image size should be less than 5MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Create preview
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    // Upload immediately
+    await handleImageUpload(file);
+  };
+
+  const handleImageUpload = async (file: File) => {
+    if (!token) return;
+
+    setUploadingImage(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/auth/profile-picture`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+         toast({
+           title: "Success",
+           description: "Profile picture updated successfully",
+         });
+         
+         // Update redux state
+         dispatch(updateProfile({
+           profilePicture: data.data.profilePicture
+         }));
+         
+         // Refresh profile to get the new image URL
+         await fetchProfile();
+         setPreviewUrl(null);
+       } else {
+        throw new Error(data.message || 'Upload failed');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "An error occurred during upload",
+        variant: "destructive",
+      });
+      setPreviewUrl(null);
+    } finally {
+      setUploadingImage(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -247,10 +359,49 @@ export const ProfileManagement = () => {
             <Card>
               <CardContent className="pt-6 space-y-6">
                 <div className="flex flex-col items-center text-center pb-6 border-b">
-                  <div className="h-24 w-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-4 border-4 border-background shadow-sm">
-                    <span className="text-4xl font-bold text-primary">{firstInitial}</span>
+                  <div 
+                    className="relative group cursor-pointer"
+                    onClick={handleImageClick}
+                  >
+                    <div className="h-24 w-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/10 flex items-center justify-center mb-4 border-4 border-background shadow-sm overflow-hidden relative">
+                      {uploadingImage ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 z-10">
+                          <Loader2 className="h-8 w-8 animate-spin text-white" />
+                        </div>
+                      ) : null}
+                      
+                      {previewUrl || profileData.profilePicture ? (
+                        <img 
+                          src={previewUrl || `${API_BASE_URL}/${profileData.profilePicture}`} 
+                          alt="Profile" 
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-4xl font-bold text-primary">{firstInitial}</span>
+                      )}
+                      
+                      {/* Hover Overlay */}
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                        <Camera className="h-8 w-8 text-white" />
+                      </div>
+                    </div>
+
+                    {/* Badge Icon */}
+                    <div className="absolute bottom-4 right-0 h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white border-2 border-background shadow-sm group-hover:scale-110 transition-transform">
+                      <Camera className="h-4 w-4" />
+                    </div>
                   </div>
-                  <h3 className="font-bold text-lg">{profileData.name}</h3>
+
+                  <input 
+                    type="file"
+                    ref={fileInputRef}
+                    className="hidden"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    onChange={handleFileChange}
+                    disabled={uploadingImage}
+                  />
+
+                  <h3 className="font-bold text-lg mt-2">{profileData.name}</h3>
                   <p className="text-sm text-muted-foreground">{profileData.position || profileData.employeeId || "Staff Member"}</p>
                 </div>
                 <div className="space-y-4">

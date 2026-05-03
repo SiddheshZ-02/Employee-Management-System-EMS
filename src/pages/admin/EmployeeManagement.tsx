@@ -44,7 +44,7 @@ import {
   setEmployees,
   type Employee,
 } from "@/store/slices/employeeSlice";
-import { Plus, Edit, Trash2, Search, Eye, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Edit, Trash2, Search, Eye, EyeOff, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { API_BASE_URL } from "@/constant/Config";
 
@@ -111,6 +111,9 @@ export const EmployeeManagement = () => {
     dateOfBirth: "",
     status: "Active" as "Active" | "Inactive",
   });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const filteredEmployees = employees.filter(
     (emp) =>
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -142,6 +145,9 @@ export const EmployeeManagement = () => {
       dateOfBirth: "",
       status: "Active",
     });
+    setErrors({});
+    setShowPassword(false);
+    setShowConfirmPassword(false);
     setEditingEmployee(null);
   };
 
@@ -441,46 +447,50 @@ export const EmployeeManagement = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (
-      !formData.name ||
-      !formData.email ||
-      !formData.employeeId ||
-      !formData.position ||
-      !formData.department
-    ) {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) newErrors.name = "Full name is required";
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = "Invalid email format";
+    }
+    if (!formData.position.trim()) newErrors.position = "Position is required";
+    if (!formData.department) newErrors.department = "Department is required";
+
+    if (!editingEmployee) {
+      if (!formData.phone.trim()) {
+        newErrors.phone = "Phone number is required";
+      } else if (!/^\d{10}$/.test(formData.phone)) {
+        newErrors.phone = "Phone must be exactly 10 digits";
+      }
+
+      if (!formData.password) {
+        newErrors.password = "Password is required";
+      } else if (formData.password.length < 6) {
+        newErrors.password = "Minimum 6 characters";
+      }
+
+      if (!formData.confirmPassword) {
+        newErrors.confirmPassword = "Confirm password is required";
+      } else if (formData.password !== formData.confirmPassword) {
+        newErrors.confirmPassword = "Passwords do not match";
+      }
+
+      if (!formData.role) newErrors.role = "Role is required";
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       toast({
-        title: "Missing fields",
-        description: "Please fill in all required fields",
+        title: "Validation Error",
+        description: "Please correct the errors in the form",
         variant: "destructive",
       });
       return;
     }
+
     if (!editingEmployee) {
-      // Only validate password fields when adding
-      if (!formData.password || !formData.confirmPassword || !formData.role) {
-        toast({
-          title: "Missing fields",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        toast({
-          title: "Password mismatch",
-          description: "Passwords do not match",
-          variant: "destructive",
-        });
-        return;
-      }
-      if (formData.password.length < 6) {
-        toast({
-          title: "Weak password",
-          description: "Password must be at least 6 characters long",
-          variant: "destructive",
-        });
-        return;
-      }
       fetchAddEmployee();
     } else if (editingEmployee && (editingEmployee.id || editingEmployee._id)) {
       const updatePayload = {
@@ -548,30 +558,33 @@ export const EmployeeManagement = () => {
                     <form onSubmit={handleSubmit}>
                       <div className="grid gap-4 py-4">
                         <div className="grid gap-2">
-                          <Label htmlFor="name">Full Name</Label>
+                          <Label htmlFor="name" className={errors.name ? "text-destructive" : ""}>Full Name</Label>
                           <Input
                             id="name"
                             value={formData.name}
-                            onChange={(e) =>
-                              setFormData({ ...formData, name: e.target.value })
-                            }
+                            onChange={(e) => {
+                              setFormData({ ...formData, name: e.target.value });
+                              if (errors.name) setErrors({ ...errors, name: "" });
+                            }}
                             placeholder="Enter full name"
+                            className={errors.name ? "border-destructive focus-visible:ring-destructive" : ""}
                           />
+                          {errors.name && <p className="text-xs text-destructive">{errors.name}</p>}
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="email">Email</Label>
+                          <Label htmlFor="email" className={errors.email ? "text-destructive" : ""}>Email</Label>
                           <Input
                             id="email"
                             type="email"
                             value={formData.email}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                email: e.target.value,
-                              })
-                            }
+                            onChange={(e) => {
+                              setFormData({ ...formData, email: e.target.value });
+                              if (errors.email) setErrors({ ...errors, email: "" });
+                            }}
                             placeholder="Enter email address"
+                            className={errors.email ? "border-destructive focus-visible:ring-destructive" : ""}
                           />
+                          {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
                         </div>
                         {!editingEmployee && (
                           <>
@@ -584,60 +597,80 @@ export const EmployeeManagement = () => {
                               />
                             </div>
                             <div className="grid gap-2">
-                              <Label htmlFor="phone">Phone Number</Label>
+                              <Label htmlFor="phone" className={errors.phone ? "text-destructive" : ""}>Phone Number</Label>
                               <Input
                                 id="phone"
                                 value={formData.phone}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    phone: e.target.value,
-                                  })
-                                }
-                                placeholder="Enter phone number"
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                                  setFormData({ ...formData, phone: val });
+                                  if (errors.phone) setErrors({ ...errors, phone: "" });
+                                }}
+                                placeholder="Enter 10-digit phone number"
+                                className={errors.phone ? "border-destructive focus-visible:ring-destructive" : ""}
                               />
+                              {errors.phone && <p className="text-xs text-destructive">{errors.phone}</p>}
                             </div>
                             <div className="grid gap-2">
-                              <Label htmlFor="password">Password</Label>
-                              <Input
-                                id="password"
-                                type="password"
-                                value={formData.password}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    password: e.target.value,
-                                  })
-                                }
-                                placeholder="Enter password"
-                              />
+                              <Label htmlFor="password" className={errors.password ? "text-destructive" : ""}>Password</Label>
+                              <div className="relative">
+                                <Input
+                                  id="password"
+                                  type={showPassword ? "text" : "password"}
+                                  value={formData.password}
+                                  onChange={(e) => {
+                                    setFormData({ ...formData, password: e.target.value });
+                                    if (errors.password) setErrors({ ...errors, password: "" });
+                                  }}
+                                  placeholder="Enter password"
+                                  className={errors.password ? "border-destructive pr-10" : "pr-10"}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                              {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
                             </div>
                             <div className="grid gap-2">
-                              <Label htmlFor="confirmPassword">
+                              <Label htmlFor="confirmPassword" className={errors.confirmPassword ? "text-destructive" : ""}>
                                 Confirm Password
                               </Label>
-                              <Input
-                                id="confirmPassword"
-                                type="password"
-                                value={formData.confirmPassword}
-                                onChange={(e) =>
-                                  setFormData({
-                                    ...formData,
-                                    confirmPassword: e.target.value,
-                                  })
-                                }
-                                placeholder="Confirm password"
-                              />
+                              <div className="relative">
+                                <Input
+                                  id="confirmPassword"
+                                  type={showConfirmPassword ? "text" : "password"}
+                                  value={formData.confirmPassword}
+                                  onChange={(e) => {
+                                    setFormData({ ...formData, confirmPassword: e.target.value });
+                                    if (errors.confirmPassword) setErrors({ ...errors, confirmPassword: "" });
+                                  }}
+                                  placeholder="Confirm password"
+                                  className={errors.confirmPassword ? "border-destructive pr-10" : "pr-10"}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                >
+                                  {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                              </div>
+                              {errors.confirmPassword && <p className="text-xs text-destructive">{errors.confirmPassword}</p>}
                             </div>
                             <div className="grid gap-2">
-                              <Label htmlFor="role">Role</Label>
+                              <Label htmlFor="role" className={errors.role ? "text-destructive" : ""}>Role</Label>
                               <Select
                                 value={formData.role}
-                                onValueChange={(value) =>
-                                  setFormData({ ...formData, role: value })
-                                }
+                                onValueChange={(value) => {
+                                  setFormData({ ...formData, role: value });
+                                  if (errors.role) setErrors({ ...errors, role: "" });
+                                }}
                               >
-                                <SelectTrigger>
+                                <SelectTrigger className={errors.role ? "border-destructive" : ""}>
                                   <SelectValue placeholder="Select role" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -646,6 +679,7 @@ export const EmployeeManagement = () => {
                                   </SelectItem>
                                 </SelectContent>
                               </Select>
+                              {errors.role && <p className="text-xs text-destructive">{errors.role}</p>}
                             </div>
                           </>
                         )}
@@ -664,28 +698,29 @@ export const EmployeeManagement = () => {
                           />
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="role">Position</Label>
+                          <Label htmlFor="position" className={errors.position ? "text-destructive" : ""}>Position</Label>
                           <Input
-                            id="role"
+                            id="position"
                             value={formData.position}
-                            onChange={(e) =>
-                              setFormData({
-                                ...formData,
-                                position: e.target.value,
-                              })
-                            }
+                            onChange={(e) => {
+                              setFormData({ ...formData, position: e.target.value });
+                              if (errors.position) setErrors({ ...errors, position: "" });
+                            }}
                             placeholder="Enter position"
+                            className={errors.position ? "border-destructive focus-visible:ring-destructive" : ""}
                           />
+                          {errors.position && <p className="text-xs text-destructive">{errors.position}</p>}
                         </div>
                         <div className="grid gap-2">
-                          <Label htmlFor="department">Department</Label>
+                          <Label htmlFor="department" className={errors.department ? "text-destructive" : ""}>Department</Label>
                           <Select
                             value={formData.department}
-                            onValueChange={(value) =>
-                              setFormData({ ...formData, department: value })
-                            }
+                            onValueChange={(value) => {
+                              setFormData({ ...formData, department: value });
+                              if (errors.department) setErrors({ ...errors, department: "" });
+                            }}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className={errors.department ? "border-destructive" : ""}>
                               <SelectValue placeholder="Select department" />
                             </SelectTrigger>
                             <SelectContent>
@@ -706,6 +741,7 @@ export const EmployeeManagement = () => {
                               })}
                             </SelectContent>
                           </Select>
+                          {errors.department && <p className="text-xs text-destructive">{errors.department}</p>}
                         </div>
                         <div className="grid gap-2">
                           <Label htmlFor="status">Status</Label>

@@ -290,6 +290,18 @@ export const updateCompany = async (
   });
 };
 
+export const toggleCompanyStatus = async (
+  id: string,
+  status: "active" | "inactive"
+): Promise<{ success: boolean; message: string }> => {
+  const token = getToken();
+  return apiRequest(`/api/owner/companies/${id}/status`, {
+    method: "PATCH",
+    token,
+    body: { status },
+  });
+};
+
 export const deleteCompany = async (
   id: string
 ): Promise<{ success: boolean; message: string }> => {
