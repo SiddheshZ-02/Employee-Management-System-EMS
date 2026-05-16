@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppSelector } from "@/hooks/useAppSelector";
@@ -75,7 +76,7 @@ interface Summary {
 }
 
 const AttendanceTracking = () => {
-  const { token, user } = useAppSelector((state) => state.auth);
+  const { token, user, timezone } = useAppSelector((state) => state.auth);
 
   // Use user's creation date as the minimum possible date for attendance
   const accountCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date("2024-01-01");
@@ -164,7 +165,9 @@ const AttendanceTracking = () => {
         if (day.checkInTime) {
           try {
             const d = parseISO(day.checkInTime);
-            checkInLabel = isNaN(d.getTime()) ? day.checkInTime : format(d, "hh:mm a");
+            checkInLabel = isNaN(d.getTime()) 
+              ? day.checkInTime 
+              : formatInTimeZone(d, timezone, "hh:mm a");
           } catch {
             checkInLabel = day.checkInTime;
           }
@@ -185,7 +188,9 @@ const AttendanceTracking = () => {
         } else if (day.checkOutTime) {
           try {
             const d = parseISO(day.checkOutTime);
-            checkOutLabel = isNaN(d.getTime()) ? day.checkOutTime : format(d, "hh:mm a");
+            checkOutLabel = isNaN(d.getTime()) 
+              ? day.checkOutTime 
+              : formatInTimeZone(d, timezone, "hh:mm a");
           } catch {
             checkOutLabel = day.checkOutTime;
           }

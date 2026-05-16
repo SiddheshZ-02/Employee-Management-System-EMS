@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { API_BASE_URL } from "@/constant/Config";
 import { Badge } from "@/components/ui/badge";
 import { useAppSelector } from "@/hooks/useAppSelector";
+import { fromZonedTime } from "date-fns-tz";
 
 interface QuickCheckoutModalProps {
   open: boolean;
@@ -31,18 +32,15 @@ const QuickCheckoutModal = ({
   onSuccess,
   attendanceData,
 }: QuickCheckoutModalProps) => {
-  const { token } = useAppSelector((state) => state.auth);
+  const { token, timezone } = useAppSelector((state) => state.auth);
   const [checkOutTime, setCheckOutTime] = useState("18:00");
   const [loading, setLoading] = useState(false);
   const [workingHours, setWorkingHours] = useState("");
 
   useEffect(() => {
-    if (attendanceData?.checkInTime && checkOutTime) {
+    if (attendanceData?.date && checkOutTime) {
       const checkInDate = new Date(attendanceData.checkInTime);
-      const [outHours, outMinutes] = checkOutTime.split(":").map(Number);
-      
-      const checkOutDate = new Date(checkInDate);
-      checkOutDate.setHours(outHours, outMinutes, 0, 0);
+      const checkOutDate = fromZonedTime(`${attendanceData.date} ${checkOutTime}`, timezone);
 
       if (checkOutDate <= checkInDate) {
         setWorkingHours("Invalid: Must be after check-in");
@@ -56,7 +54,7 @@ const QuickCheckoutModal = ({
     } else {
       setWorkingHours("");
     }
-  }, [checkOutTime, attendanceData?.checkInTime]);
+  }, [checkOutTime, attendanceData, timezone]);
 
   const handleSubmit = async () => {
     if (!attendanceData) {
@@ -70,9 +68,7 @@ const QuickCheckoutModal = ({
     }
 
     const checkInDate = new Date(attendanceData.checkInTime);
-    const [outHours, outMinutes] = checkOutTime.split(":").map(Number);
-    const checkOutDate = new Date(checkInDate);
-    checkOutDate.setHours(outHours, outMinutes, 0, 0);
+    const checkOutDate = fromZonedTime(`${attendanceData.date} ${checkOutTime}`, timezone);
 
     if (checkOutDate <= checkInDate) {
       toast.error("Check-out time must be after check-in time.");

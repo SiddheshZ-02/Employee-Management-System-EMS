@@ -11,6 +11,7 @@ export interface User {
   name: string;
   role: UserRole;
   companyId?: string;
+  timezone?: string;
   department?: string;
   phone?: string;
   avatar?: string;
@@ -20,6 +21,7 @@ export interface User {
 
 export interface AuthState {
   user: User | null;
+  timezone: string;
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
@@ -30,6 +32,7 @@ export interface AuthState {
 
 const initialState: AuthState = {
   user: null,
+  timezone: "Asia/Kolkata",
   token: null,
   refreshToken: null,
   isAuthenticated: false,
@@ -48,10 +51,11 @@ const authSlice = createSlice({
     },
     loginSuccess: (
       state,
-      action: PayloadAction<{ user: User; token: string; refreshToken?: string }>
+      action: PayloadAction<{ user: User; token: string; refreshToken?: string; timezone?: string }>
     ) => {
       state.loading = false;
       state.user = action.payload.user;
+      state.timezone = action.payload.timezone || action.payload.user.timezone || "Asia/Kolkata";
       state.token = action.payload.token;
       state.refreshToken = action.payload.refreshToken || null;
       state.isAuthenticated = true;
@@ -63,7 +67,7 @@ const authSlice = createSlice({
       if (action.payload.refreshToken) {
         localStorage.setItem("ems_refreshToken", action.payload.refreshToken);
       }
-      localStorage.setItem("ems_user", JSON.stringify(action.payload.user));
+      localStorage.setItem("ems_user", JSON.stringify({ ...action.payload.user, timezone: state.timezone }));
       localStorage.setItem("ems_sessionExpiry", String(expiry));
       localStorage.removeItem("token");
       localStorage.removeItem("refreshToken");
@@ -109,7 +113,9 @@ const authSlice = createSlice({
       if (token && userStr && expiry && expiry > Date.now()) {
         state.token = token;
         state.refreshToken = refreshToken;
-        state.user = JSON.parse(userStr);
+        const user = JSON.parse(userStr);
+        state.user = user;
+        state.timezone = user.timezone || "Asia/Kolkata";
         state.isAuthenticated = true;
         state.sessionExpiry = expiry;
         state.sessionExpired = false;

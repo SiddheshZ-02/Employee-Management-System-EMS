@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { API_BASE_URL } from "@/constant/Config";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -121,9 +122,9 @@ interface HolidayRecord {
 }
 
 export const EmployeeAttendanceDetails = () => {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAppSelector((state) => state.auth);
+  const { token, timezone } = useAppSelector((state) => state.auth);
 
   const [loading, setLoading] = useState(true);
   const [employee, setEmployee] = useState<EmployeeDetailsResponse["employee"] | null>(null);
@@ -681,11 +682,7 @@ export const EmployeeAttendanceDetails = () => {
           const d = new Date(record.checkInTime);
           checkIn = Number.isNaN(d.getTime())
             ? record.checkInTime
-            : d.toLocaleTimeString("en-IN", {
-                hour12: true,
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+            : formatInTimeZone(d, timezone, "hh:mm a");
         }
 
         let checkOut = "-";
@@ -693,11 +690,7 @@ export const EmployeeAttendanceDetails = () => {
           const d = new Date(record.checkOutTime);
           checkOut = Number.isNaN(d.getTime())
             ? record.checkOutTime
-            : d.toLocaleTimeString("en-IN", {
-                hour12: true,
-                hour: "2-digit",
-                minute: "2-digit",
-              });
+            : formatInTimeZone(d, timezone, "hh:mm a");
         }
 
         let totalHours = "0h 0m";
