@@ -1,23 +1,2 @@
-import { configureStore } from "@reduxjs/toolkit";
-import authSlice from "./slices/authSlice";
-import employeeSlice from "./slices/employeeSlice";
-import departmentSlice from "./slices/departmentSlice";
-import attendanceSlice from "./slices/attendanceSlice";
-import leaveSlice from "./slices/leaveSlice";
-import adminSlice from "./slices/adminSlice";
-import holidaySlice from "./slices/holidaySlice";
-
-export const store = configureStore({
-  reducer: {
-    auth: authSlice,
-    employees: employeeSlice,
-    departments: departmentSlice,
-    attendance: attendanceSlice,
-    leave: leaveSlice,
-    admin: adminSlice,
-    holiday: holidaySlice,
-  },
-});
-
-export type RootState = ReturnType<typeof store.getState>;
-export type AppDispatch = typeof store.dispatch;
+export { store } from "@/app/store";
+export type { RootState, AppDispatch } from "@/app/store";

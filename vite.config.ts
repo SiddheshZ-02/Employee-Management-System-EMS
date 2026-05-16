@@ -9,6 +9,15 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@app": path.resolve(__dirname, "./src/app"),
+      "@api": path.resolve(__dirname, "./src/api"),
+      "@assets": path.resolve(__dirname, "./src/assets"),
+      "@components": path.resolve(__dirname, "./src/components"),
+      "@constants": path.resolve(__dirname, "./src/constants"),
+      "@features": path.resolve(__dirname, "./src/features"),
+      "@hooks": path.resolve(__dirname, "./src/hooks"),
+      "@theme": path.resolve(__dirname, "./src/theme"),
+      "@utils": path.resolve(__dirname, "./src/utils"),
     },
   },
   // Use relative base so built assets are referenced relative to index.html.

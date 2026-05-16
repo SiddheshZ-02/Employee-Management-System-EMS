@@ -8,9 +8,16 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"],
+      "@app/*": ["./src/app/*"],
+      "@api/*": ["./src/api/*"],
+      "@assets/*": ["./src/assets/*"],
+      "@components/*": ["./src/components/*"],
+      "@constants/*": ["./src/constants/*"],
+      "@features/*": ["./src/features/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@theme/*": ["./src/theme/*"],
+      "@utils/*": ["./src/utils/*"]
     },
 
     /* Bundler mode */

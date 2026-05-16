@@ -26,7 +26,7 @@ import {
   Clock,
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { API_BASE_URL } from "@/constant/Config";
+import { API_BASE_URL } from "@/constants/config";
 import { useAppSelector } from "@/hooks/useAppSelector";
 
 // Types for real data
