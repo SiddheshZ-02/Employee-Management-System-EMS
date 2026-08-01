@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
@@ -20,10 +20,20 @@ import {
   Cake,
   Sparkles,
   Calendar as CalendarIcon,
+  MapPin,
+  Home,
+  Building2,
+  Loader2,
+  RefreshCw,
+  ShieldAlert,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { API_BASE_URL } from "@/constants/config";
 import { UpcomingHolidaysWidget } from "@/features/holidays/components/UpcomingHolidaysWidget";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   format,
   parseISO,
@@ -59,6 +69,10 @@ const LIGHT_COLORS = [
 const getPastelColor = (index: number) =>
   LIGHT_COLORS[index % LIGHT_COLORS.length];
 
+type AttendanceStatus = "idle" | "checked-in" | "checked-out";
+type WorkMode = "Office" | "WFH";
+type LocationPermission = "unknown" | "granted" | "denied";
+
 interface BackendEmployee {
   _id: string;
   name: string;
@@ -78,6 +92,11 @@ export const EmployeeDashboard = () => {
   const [upcomingBirthdays, setUpcomingBirthdays] = useState<any[]>([]);
 
   const [hoursToday, setHoursToday] = useState("0h 0m");
+  const [attendanceStatus, setAttendanceStatus] =
+    useState<AttendanceStatus>("idle");
+  const [todayAttendance, setTodayAttendance] = useState<any | null>(null);
+  const [selectedWorkMode, setSelectedWorkMode] = useState<WorkMode>("Office");
+  const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [leaveBalance, setLeaveBalance] = useState(0);
   const [monthAttendance, setMonthAttendance] = useState<{
     attended: number;
@@ -87,6 +106,62 @@ export const EmployeeDashboard = () => {
     totalDays: 0,
   });
   const [activities, setActivities] = useState<any[]>([]);
+
+  // --- Location permission gating for the attendance card ---
+  const [locationPermission, setLocationPermission] =
+    useState<LocationPermission>("unknown");
+  const [isCheckingLocationPermission, setIsCheckingLocationPermission] =
+    useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const checkExistingPermission = async () => {
+      try {
+        if (
+          typeof navigator !== "undefined" &&
+          (navigator as any).permissions?.query
+        ) {
+          const status = await (navigator as any).permissions.query({
+            name: "geolocation",
+          });
+          if (!cancelled) {
+            if (status.state === "granted") setLocationPermission("granted");
+            else if (status.state === "denied") setLocationPermission("denied");
+            else setLocationPermission("unknown");
+
+            status.onchange = () => {
+              if (status.state === "granted") setLocationPermission("granted");
+              else if (status.state === "denied")
+                setLocationPermission("denied");
+              else setLocationPermission("unknown");
+            };
+          }
+        }
+      } catch {
+        // Permissions API not supported (e.g. Safari) — fall back to "unknown"
+        // and let the user trigger the browser prompt via the button.
+      } finally {
+        if (!cancelled) setIsCheckingLocationPermission(false);
+      }
+    };
+
+    checkExistingPermission();
+
+    // Re-check whenever the user comes back to this tab/page (not just on
+    // a hard reload) so a permission change made elsewhere is reflected.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkExistingPermission();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []);
 
   const filteredActivities = useMemo(() => {
     const today = new Date();
@@ -107,6 +182,294 @@ export const EmployeeDashboard = () => {
   const [weeklyData, setWeeklyData] = useState<any[]>([]);
   const [leaves, setLeaves] = useState<any[]>([]);
   const [holidays, setHolidaysState] = useState<any[]>([]);
+
+  // Office location + distance state
+  const [officeLocations, setOfficeLocations] = useState<any[]>([]);
+  const [nearestOffice, setNearestOffice] = useState<any | null>(null);
+  const [nearestDistance, setNearestDistance] = useState<number | null>(null);
+  const [isWithinOfficeRadius, setIsWithinOfficeRadius] = useState<
+    boolean | null
+  >(null);
+  const [wfhDistance, setWfhDistance] = useState<number | null>(null);
+  const [wfhAllowedRadius, setWfhAllowedRadius] = useState<number | null>(null);
+  const [isReloadingDistance, setIsReloadingDistance] = useState(false);
+
+  const getCurrentLocation = useCallback(() => {
+    return new Promise<{ latitude: number; longitude: number }>(
+      (resolve, reject) => {
+        if (typeof navigator === "undefined" || !navigator.geolocation) {
+          reject(new Error("Geolocation is not supported in this browser."));
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+            });
+          },
+          (error) => {
+            reject(error);
+          },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
+        );
+      },
+    );
+  }, []);
+
+  const calculateDistanceMeters = useCallback(
+    (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const toRad = (deg: number) => (deg * Math.PI) / 180;
+      const R = 6371000; // metres
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) *
+          Math.cos(toRad(lat2)) *
+          Math.sin(dLon / 2) *
+          Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    },
+    [],
+  );
+
+  const computeNearestOffice = useCallback(
+    (loc: { latitude: number; longitude: number }) => {
+      if (!officeLocations || officeLocations.length === 0) return;
+
+      let nearest: any = null;
+      let nearestDist = Infinity;
+
+      for (const office of officeLocations) {
+        const officeLat = office.location?.coordinates
+          ? office.location.coordinates[1]
+          : undefined;
+        const officeLng = office.location?.coordinates
+          ? office.location.coordinates[0]
+          : undefined;
+
+        if (officeLat === undefined || officeLng === undefined) continue;
+
+        const dist = calculateDistanceMeters(
+          loc.latitude,
+          loc.longitude,
+          officeLat,
+          officeLng,
+        );
+
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          nearest = office;
+        }
+      }
+
+      if (nearest) {
+        setNearestOffice(nearest);
+        setNearestDistance(Math.round(nearestDist));
+        setIsWithinOfficeRadius(nearestDist <= (nearest.radius || 0));
+      }
+    },
+    [officeLocations, calculateDistanceMeters],
+  );
+
+  const requestLocationPermission = useCallback(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setLocationPermission("denied");
+      return;
+    }
+    setIsCheckingLocationPermission(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setLocationPermission("granted");
+        setIsCheckingLocationPermission(false);
+        try {
+          computeNearestOffice({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        } catch {
+          // ignore
+        }
+      },
+      () => {
+        setLocationPermission("denied");
+        setIsCheckingLocationPermission(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }, [computeNearestOffice]);
+
+  // When user selects Office mode and permission + office list available,
+  // compute distance proactively so user can see whether inside radius before check-in.
+  useEffect(() => {
+    if (
+      selectedWorkMode === "Office" &&
+      locationPermission === "granted" &&
+      officeLocations.length > 0
+    ) {
+      (async () => {
+        try {
+          const loc = await getCurrentLocation();
+          computeNearestOffice(loc);
+        } catch {
+          // ignore
+        }
+      })();
+    }
+  }, [
+    selectedWorkMode,
+    locationPermission,
+    officeLocations,
+    getCurrentLocation,
+    computeNearestOffice,
+  ]);
+
+  // For WFH: compute distance after check-in so user sees how far they are from their check-in anchor
+  useEffect(() => {
+    if (!todayAttendance || todayAttendance.workMode !== "WFH") return;
+
+    const allowed = todayAttendance.wfhCheckoutRadius || 100;
+    setWfhAllowedRadius(allowed);
+
+    (async () => {
+      try {
+        const loc = await getCurrentLocation();
+        const checkInLat = todayAttendance.checkInLocation?.coordinates
+          ? todayAttendance.checkInLocation.coordinates[1]
+          : null;
+        const checkInLng = todayAttendance.checkInLocation?.coordinates
+          ? todayAttendance.checkInLocation.coordinates[0]
+          : null;
+
+        if (checkInLat !== null && checkInLng !== null) {
+          const dist = calculateDistanceMeters(
+            loc.latitude,
+            loc.longitude,
+            checkInLat,
+            checkInLng,
+          );
+          setWfhDistance(Math.round(dist));
+        }
+      } catch {
+        setWfhDistance(null);
+      }
+    })();
+  }, [todayAttendance, getCurrentLocation, calculateDistanceMeters]);
+
+  const reloadDistance = useCallback(async () => {
+    if (!getCurrentLocation) return;
+    setIsReloadingDistance(true);
+    try {
+      const loc = await getCurrentLocation();
+      if (selectedWorkMode === "Office") {
+        computeNearestOffice(loc);
+      }
+
+      if (
+        selectedWorkMode === "WFH" &&
+        todayAttendance &&
+        todayAttendance.workMode === "WFH"
+      ) {
+        const checkInLat = todayAttendance.checkInLocation?.coordinates
+          ? todayAttendance.checkInLocation.coordinates[1]
+          : null;
+        const checkInLng = todayAttendance.checkInLocation?.coordinates
+          ? todayAttendance.checkInLocation.coordinates[0]
+          : null;
+
+        if (checkInLat !== null && checkInLng !== null) {
+          const dist = calculateDistanceMeters(
+            loc.latitude,
+            loc.longitude,
+            checkInLat,
+            checkInLng,
+          );
+          setWfhDistance(Math.round(dist));
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsReloadingDistance(false);
+    }
+  }, [
+    getCurrentLocation,
+    selectedWorkMode,
+    computeNearestOffice,
+    todayAttendance,
+    calculateDistanceMeters,
+  ]);
+
+  const handleAttendanceAction = useCallback(async () => {
+    if (!token) {
+      toast.error("Please sign in again to mark attendance.");
+      return;
+    }
+
+    setIsSubmittingAttendance(true);
+
+    try {
+      const location = await getCurrentLocation();
+      setLocationPermission("granted");
+      const isCheckingOut = attendanceStatus === "checked-in";
+      const endpoint = isCheckingOut ? "checkout" : "checkin";
+      const payload: Record<string, unknown> = {
+        latitude: location.latitude,
+        longitude: location.longitude,
+      };
+
+      if (!isCheckingOut) {
+        payload.workMode = selectedWorkMode;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/attendance/${endpoint}`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Unable to update attendance right now.",
+        );
+      }
+
+      setTodayAttendance(data.attendance || null);
+      setAttendanceStatus(
+        data.attendance?.status === "checked-out"
+          ? "checked-out"
+          : "checked-in",
+      );
+      setSelectedWorkMode(
+        (data.attendance?.workMode as WorkMode) || selectedWorkMode,
+      );
+      setHoursToday(data.stats?.totalHours || "0h 0m");
+      toast.success(data.message || "Attendance updated successfully.");
+    } catch (error: any) {
+      if (error?.code === 1) {
+        // GeolocationPositionError.PERMISSION_DENIED
+        setLocationPermission("denied");
+      }
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Unable to update attendance right now.";
+      toast.error(message);
+    } finally {
+      setIsSubmittingAttendance(false);
+    }
+  }, [attendanceStatus, getCurrentLocation, selectedWorkMode, token]);
 
   useEffect(() => {
     if (!token) {
@@ -147,6 +510,9 @@ export const EmployeeDashboard = () => {
           fetch(`${API_BASE_URL}/api/leave/leave-cards-status`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
+          fetch(`${API_BASE_URL}/api/attendance/office-location`, {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
         ]);
 
         const [
@@ -159,6 +525,7 @@ export const EmployeeDashboard = () => {
           colleaguesRes,
           birthdaysRes,
           leaveCardsRes,
+          officeRes,
         ] = responses.map((r) =>
           r.status === "fulfilled"
             ? r.value
@@ -170,24 +537,24 @@ export const EmployeeDashboard = () => {
           if (leaveCardsJson.success) {
             const cards = leaveCardsJson.leaveCards || [];
             // Leave cards data fetched but not currently displayed
-            
+
             if (balanceRes.ok) {
               const balanceJson = await balanceRes.json();
               if (balanceJson.success && Array.isArray(balanceJson.balances)) {
                 const yearlyBalances = balanceJson.balances.filter(
-                  (b: any) => !b.isAllocationBased
+                  (b: any) => !b.isAllocationBased,
                 );
-                
+
                 const yearlyTotal = yearlyBalances.reduce(
                   (sum: number, b: any) => sum + (b.remainingDays || 0),
                   0,
                 );
-                
+
                 const grantedTotal = cards.reduce(
                   (sum: number, card: any) => sum + (card.available_days || 0),
                   0,
                 );
-                
+
                 setLeaveBalance(yearlyTotal + grantedTotal);
               }
             }
@@ -233,6 +600,19 @@ export const EmployeeDashboard = () => {
         if (todayRes.ok) {
           const todayJson = await todayRes.json();
           if (todayJson.success) {
+            setTodayAttendance(todayJson.attendance || null);
+            if (todayJson.attendance?.status === "checked-in") {
+              setAttendanceStatus("checked-in");
+            } else if (todayJson.attendance?.status === "checked-out") {
+              setAttendanceStatus("checked-out");
+            } else {
+              setAttendanceStatus("idle");
+            }
+            if (todayJson.attendance?.workMode) {
+              setSelectedWorkMode(
+                todayJson.attendance.workMode === "WFH" ? "WFH" : "Office",
+              );
+            }
             if (todayJson.stats && todayJson.stats.totalHours) {
               setHoursToday(todayJson.stats.totalHours);
             } else {
@@ -268,6 +648,24 @@ export const EmployeeDashboard = () => {
             currentHolidays = holidayJson.holidays;
             setHolidaysState(holidayJson.holidays);
             dispatch(setHolidays(holidayJson.holidays));
+          }
+        }
+
+        // Office locations (for distance/radius display)
+        if (officeRes && officeRes.ok) {
+          const officeJson = await officeRes.json();
+          if (officeJson.success && Array.isArray(officeJson.officeLocations)) {
+            setOfficeLocations(officeJson.officeLocations);
+
+            // If location permission already granted, compute nearest immediately
+            if (locationPermission === "granted") {
+              try {
+                const loc = await getCurrentLocation();
+                computeNearestOffice(loc);
+              } catch {
+                // ignore
+              }
+            }
           }
         }
 
@@ -351,8 +749,23 @@ export const EmployeeDashboard = () => {
 
         if (todayRes.ok) {
           const data = await todayRes.json();
-          if (data.success && data.stats && data.stats.totalHours) {
-            setHoursToday(data.stats.totalHours);
+          if (data.success) {
+            setTodayAttendance(data.attendance || null);
+            if (data.attendance?.status === "checked-in") {
+              setAttendanceStatus("checked-in");
+            } else if (data.attendance?.status === "checked-out") {
+              setAttendanceStatus("checked-out");
+            } else {
+              setAttendanceStatus("idle");
+            }
+            if (data.attendance?.workMode) {
+              setSelectedWorkMode(
+                data.attendance.workMode === "WFH" ? "WFH" : "Office",
+              );
+            }
+            if (data.stats && data.stats.totalHours) {
+              setHoursToday(data.stats.totalHours);
+            }
           }
         }
 
@@ -424,6 +837,8 @@ export const EmployeeDashboard = () => {
 
     return () => clearInterval(interval);
   }, [token, holidays, leaves]);
+
+  const isLocationGranted = locationPermission === "granted";
 
   return (
     <div className="w-full min-h-full bg-background">
@@ -616,6 +1031,265 @@ export const EmployeeDashboard = () => {
                 </CardContent>
               </Card>
             </div>
+          </div>
+
+          {/* --- Attendance Check-In: minimal, blurred + location-gated --- */}
+          <div
+            className="grid gap-6 lg:grid-cols-1 animate-fade-in"
+            style={{ animationDelay: "150ms" }}
+          >
+            <Card className="relative hover-lift transition-smooth border-0 shadow-lg overflow-hidden bg-gradient-to-br from-card to-card/95">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <div className="p-2 rounded-full bg-blue-500/10">
+                      <MapPin className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <span>Attendance</span>
+                  </CardTitle>
+                  <Badge
+                    className={
+                      "transition-colors duration-300 " +
+                      (attendanceStatus === "checked-in"
+                        ? "bg-green-600 hover:bg-green-700"
+                        : "bg-slate-500 hover:bg-slate-600")
+                    }
+                  >
+                    {attendanceStatus === "checked-in"
+                      ? "Checked in"
+                      : attendanceStatus === "checked-out"
+                        ? "Checked out"
+                        : "Not started"}
+                  </Badge>
+                </div>
+              </CardHeader>
+
+              {/* Content — blurred and inert until location permission is granted */}
+              <CardContent
+                className={
+                  "space-y-4 transition-all duration-500 ease-out " +
+                  (isLocationGranted
+                    ? "blur-0 opacity-100"
+                    : "blur-md opacity-70 select-none pointer-events-none")
+                }
+                aria-hidden={!isLocationGranted}
+              >
+                <div className="flex rounded-lg bg-muted p-1 text-sm max-w-xs">
+                  {(["Office", "WFH"] as WorkMode[]).map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => setSelectedWorkMode(m)}
+                      disabled={
+                        isSubmittingAttendance ||
+                        attendanceStatus === "checked-in"
+                      }
+                      className={
+                        "flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors " +
+                        (selectedWorkMode === m
+                          ? "bg-background shadow-sm font-medium"
+                          : "text-muted-foreground")
+                      }
+                    >
+                      {m === "Office" ? (
+                        <Building2 className="h-3.5 w-3.5" />
+                      ) : (
+                        <Home className="h-3.5 w-3.5" />
+                      )}
+                      {m === "Office" ? "Office" : "WFH"}
+                    </button>
+                  ))}
+                </div>
+
+                <Button
+                  onClick={handleAttendanceAction}
+                  disabled={isSubmittingAttendance}
+                  className={
+                    "w-full sm:w-auto gap-2 " +
+                    (attendanceStatus === "checked-in"
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-green-600 hover:bg-green-700")
+                  }
+                >
+                  {isSubmittingAttendance ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : attendanceStatus === "checked-in" ? (
+                    <LogOut className="h-4 w-4" />
+                  ) : (
+                    <LogIn className="h-4 w-4" />
+                  )}
+                  {isSubmittingAttendance
+                    ? attendanceStatus === "checked-in"
+                      ? "Checking out…"
+                      : "Checking in…"
+                    : attendanceStatus === "checked-in"
+                      ? "Check out"
+                      : "Check in"}
+                </Button>
+                {isLocationGranted &&
+                  selectedWorkMode === "Office" &&
+                  nearestOffice && (
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm">
+                          Office check-in distance
+                        </div>
+                        <button
+                          type="button"
+                          onClick={reloadDistance}
+                          disabled={isReloadingDistance}
+                          aria-label="Refresh distance"
+                          className="p-1 rounded hover:bg-muted/10 disabled:opacity-60"
+                        >
+                          {isReloadingDistance ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="mt-1">
+                        {nearestDistance !== null ? (
+                          <>
+                            <span>{nearestDistance}m away</span>
+                            <span className="mx-2">•</span>
+                            <span>Radius {nearestOffice.radius || 0}m</span>
+                            <span className="mx-2">•</span>
+                            <span
+                              className={
+                                isWithinOfficeRadius
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {isWithinOfficeRadius
+                                ? "Within radius"
+                                : "Outside radius"}
+                            </span>
+                          </>
+                        ) : (
+                          <span>Distance: unavailable</span>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          onClick={reloadDistance}
+                          disabled={isReloadingDistance}
+                          className="inline-flex items-center gap-2"
+                        >
+                          {isReloadingDistance ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            "Refresh distance"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                {isLocationGranted &&
+                  selectedWorkMode === "WFH" &&
+                  todayAttendance &&
+                  todayAttendance.workMode === "WFH" && (
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <div className="font-medium text-sm">
+                          WFH check-in distance
+                        </div>
+                        <button
+                          type="button"
+                          onClick={reloadDistance}
+                          disabled={isReloadingDistance}
+                          aria-label="Refresh distance"
+                          className="p-1 rounded hover:bg-muted/10 disabled:opacity-60"
+                        >
+                          {isReloadingDistance ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
+                        </button>
+                      </div>
+                      <div className="mt-1">
+                        {wfhDistance !== null ? (
+                          <>
+                            <span>{wfhDistance}m away from check-in</span>
+                            <span className="mx-2">•</span>
+                            <span>Allowed radius {wfhAllowedRadius || 0}m</span>
+                            <span className="mx-2">•</span>
+                            <span
+                              className={
+                                wfhDistance !== null &&
+                                wfhAllowedRadius !== null &&
+                                wfhDistance <= wfhAllowedRadius
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }
+                            >
+                              {wfhDistance !== null &&
+                              wfhAllowedRadius !== null &&
+                              wfhDistance <= wfhAllowedRadius
+                                ? "Within radius"
+                                : "Outside radius"}
+                            </span>
+                          </>
+                        ) : (
+                          <span>Distance: unavailable</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+              </CardContent>
+
+              {/* Overlay shown until location permission is granted */}
+              {!isLocationGranted && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/50 backdrop-blur-[1px] animate-in fade-in duration-300">
+                  <div
+                    key={locationPermission}
+                    className="flex flex-col items-center gap-3 px-6 text-center animate-in fade-in zoom-in-95 duration-300"
+                  >
+                    {locationPermission === "denied" ? (
+                      <>
+                        <div className="p-2 rounded-full bg-red-500/10">
+                          <ShieldAlert className="h-5 w-5 text-red-500" />
+                        </div>
+                        <p className="text-sm text-muted-foreground max-w-[240px]">
+                          Location access was denied. Enable it in your browser
+                          settings, then try again.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <div className="p-2 rounded-full bg-blue-500/10">
+                          <MapPin className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <p className="text-sm text-muted-foreground max-w-[240px]">
+                          Turn on location to check in or out.
+                        </p>
+                      </>
+                    )}
+                    <Button
+                      size="sm"
+                      onClick={requestLocationPermission}
+                      disabled={isCheckingLocationPermission}
+                      className="transition-transform active:scale-95"
+                    >
+                      {isCheckingLocationPermission ? (
+                        <span className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Requesting…
+                        </span>
+                      ) : locationPermission === "denied" ? (
+                        "Try again"
+                      ) : (
+                        "Allow location"
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Card>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">

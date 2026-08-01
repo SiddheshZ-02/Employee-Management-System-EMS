@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from "react";
-import { parseISO } from "date-fns";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { addMonths, endOfMonth, format, isBefore, isSameMonth, parseISO, startOfMonth } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, Plus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,15 +82,13 @@ const AttendanceTracking = () => {
   const accountCreatedAt = user?.createdAt ? new Date(user.createdAt) : new Date("2024-01-01");
   const accountCreatedAtStr = accountCreatedAt.toISOString().split("T")[0];
 
-  // Calculate default 30 days range
   const today = new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(today.getDate() - 30);
-
-  // If account was created less than 30 days ago, use creation date as start
-  const defaultStartDate = thirtyDaysAgo < accountCreatedAt ? accountCreatedAtStr : thirtyDaysAgo.toISOString().split("T")[0];
-
   const todayStr = today.toISOString().split("T")[0];
+  const currentMonthStart = startOfMonth(today);
+  const currentMonthStartStr = format(currentMonthStart, "yyyy-MM-dd");
+  const currentMonthEndStr = format(today, "yyyy-MM-dd");
+  const defaultStartDate = accountCreatedAt > currentMonthStart ? accountCreatedAtStr : currentMonthStartStr;
+  const currentMonthMinimum = startOfMonth(accountCreatedAt);
 
   const [rows, setRows] = useState<AttendanceRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -109,9 +107,10 @@ const AttendanceTracking = () => {
   });
 
   const [filterStart, setFilterStart] = useState<string>(defaultStartDate);
-  const [filterEnd, setFilterEnd] = useState<string>(todayStr);
+  const [filterEnd, setFilterEnd] = useState<string>(currentMonthEndStr);
   const [startDate, setStartDate] = useState<string>(defaultStartDate);
-  const [endDate, setEndDate] = useState<string>(todayStr);
+  const [endDate, setEndDate] = useState<string>(currentMonthEndStr);
+  const [currentMonth, setCurrentMonth] = useState<Date>(currentMonthStart);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [quickCheckoutModalOpen, setQuickCheckoutModalOpen] = useState(false);
   const [selectedAttendance, setSelectedAttendance] = useState<{
@@ -119,6 +118,36 @@ const AttendanceTracking = () => {
     checkInTime: string;
     checkInLabel: string;
   } | null>(null);
+
+  const currentMonthLabel = useMemo(() => format(currentMonth, "MMMM yyyy"), [currentMonth]);
+  const canGoPrevMonth = isBefore(currentMonthMinimum, currentMonth);
+  const canGoNextMonth = !isSameMonth(currentMonth, currentMonthStart);
+
+  const clampMonthRange = useCallback((monthStart: Date, monthEnd: Date) => {
+    const isCurrentMonth = isSameMonth(monthStart, currentMonthStart);
+    const end = isCurrentMonth ? today : monthEnd;
+
+    const adjustedStart = isSameMonth(currentMonthMinimum, monthStart) && accountCreatedAt > monthStart
+      ? accountCreatedAt
+      : monthStart;
+
+    return { start: adjustedStart, end };
+  }, [accountCreatedAt, currentMonthMinimum, currentMonthStart, today]);
+
+  const applyMonth = useCallback((nextMonth: Date) => {
+    const nextMonthStart = startOfMonth(nextMonth);
+    const nextMonthEnd = endOfMonth(nextMonth);
+    const { start, end } = clampMonthRange(nextMonthStart, nextMonthEnd);
+    const startStr = format(start, "yyyy-MM-dd");
+    const endStr = format(end, "yyyy-MM-dd");
+
+    setCurrentMonth(nextMonthStart);
+    setFilterStart(startStr);
+    setFilterEnd(endStr);
+    setStartDate(startStr);
+    setEndDate(endStr);
+    setCurrentPage(1);
+  }, [clampMonthRange]);
 
   const fetchAttendance = useCallback(async () => {
     if (!token) {
@@ -292,10 +321,14 @@ const AttendanceTracking = () => {
   };
 
   const resetFilters = () => {
-    setFilterStart(defaultStartDate);
-    setFilterEnd(todayStr);
-    setStartDate(defaultStartDate);
-    setEndDate(todayStr);
+    const resetStart = accountCreatedAt > currentMonthStart ? accountCreatedAtStr : currentMonthStartStr;
+    const resetEnd = currentMonthEndStr;
+
+    setCurrentMonth(currentMonthStart);
+    setFilterStart(resetStart);
+    setFilterEnd(resetEnd);
+    setStartDate(resetStart);
+    setEndDate(resetEnd);
     setCurrentPage(1);
   };
 
@@ -541,13 +574,36 @@ const AttendanceTracking = () => {
 
       {/* Attendance History Table */}
       <Card className="border shadow-sm bg-card overflow-hidden">
-        <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-semibold">Attendance History</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1">Showing records from {startDate} to {endDate}</p>
+        <CardHeader className="pb-3 border-b">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle className="text-lg font-semibold">Attendance History</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">Showing records from {startDate} to {endDate}</p>
+            </div>
+            <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+              {rows.length} Records
+            </div>
           </div>
-          <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
-            {rows.length} Records
+          <div className="mt-4 flex items-center justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0"
+              onClick={() => applyMonth(addMonths(currentMonth, -1))}
+              disabled={!canGoPrevMonth}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-semibold">{currentMonthLabel}</span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 w-9 p-0"
+              onClick={() => applyMonth(addMonths(currentMonth, 1))}
+              disabled={!canGoNextMonth}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="p-0">

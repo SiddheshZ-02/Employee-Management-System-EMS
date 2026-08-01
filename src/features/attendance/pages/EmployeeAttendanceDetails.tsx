@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { API_BASE_URL } from "@/constants/config";
 import { toast } from "@/hooks/use-toast";
-import { format } from "date-fns";
+import { addMonths, endOfMonth, format, isBefore, isSameMonth, startOfMonth } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { Clock, Calendar, CheckCircle, RotateCcw, ChevronLeft, ChevronRight, Palmtree, ArrowLeft, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -226,34 +226,72 @@ export const EmployeeAttendanceDetails = () => {
     }
   };
 
-  // Calculate default 30 days range
   const today = new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(today.getDate() - 30);
-  const todayStr = today.toISOString().split("T")[0];
-  const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+  const todayStr = format(today, "yyyy-MM-dd");
+  const currentMonthStart = startOfMonth(today);
+  const currentMonthEnd = endOfMonth(today);
+  const currentMonthStartStr = format(currentMonthStart, "yyyy-MM-dd");
+  const currentMonthEndStr = format(currentMonthEnd, "yyyy-MM-dd");
 
-  const [startDate, setStartDate] = useState(thirtyDaysAgoStr);
-  const [endDate, setEndDate] = useState(todayStr);
+  const [filterStartDate, setFilterStartDate] = useState(currentMonthStartStr);
+  const [filterEndDate, setFilterEndDate] = useState(currentMonthEndStr);
+  const [startDate, setStartDate] = useState(currentMonthStartStr);
+  const [endDate, setEndDate] = useState(currentMonthEndStr);
+  const [currentMonth, setCurrentMonth] = useState(currentMonthStart);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  const currentMonthLabel = useMemo(() => format(currentMonth, "MMMM yyyy"), [currentMonth]);
+
+  const clampMonthRange = (monthStart: Date, monthEnd: Date) => {
+    const isCurrentMonth = isSameMonth(monthStart, currentMonthStart);
+    const end = isCurrentMonth ? today : monthEnd;
+
+    if (!employee?.createdAt) {
+      return { start: monthStart, end };
+    }
+
+    const createdAt = new Date(employee.createdAt);
+    const adjustedStart = createdAt > monthStart && isSameMonth(createdAt, monthStart) ? createdAt : monthStart;
+    return { start: adjustedStart, end };
+  };
+
+  const applyMonth = (nextMonth: Date) => {
+    const nextMonthStart = startOfMonth(nextMonth);
+    const nextMonthEnd = endOfMonth(nextMonth);
+    const { start, end } = clampMonthRange(nextMonthStart, nextMonthEnd);
+    const startStr = format(start, "yyyy-MM-dd");
+    const endStr = format(end, "yyyy-MM-dd");
+
+    setCurrentMonth(nextMonthStart);
+    setFilterStartDate(startStr);
+    setFilterEndDate(endStr);
+    setStartDate(startStr);
+    setEndDate(endStr);
+    setCurrentPage(1);
+  };
 
   // Use employee's creation date as the minimum possible date for attendance
   const accountCreatedAt = employee?.createdAt ? new Date(employee.createdAt) : new Date("2024-01-01");
   const accountCreatedAtStr = accountCreatedAt.toISOString().split("T")[0];
 
   useEffect(() => {
-    if (employee?.createdAt) {
-      const createdAt = new Date(employee.createdAt);
-      const createdAtStr = createdAt.toISOString().split("T")[0];
-      
-      // If 30 days ago is before creation date, set start date to creation date
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-      
-      if (thirtyDaysAgo < createdAt) {
-        setStartDate(createdAtStr);
-      }
+    if (!employee?.createdAt) {
+      return;
+    }
+
+    const createdAt = new Date(employee.createdAt);
+    const createdAtStr = format(createdAt, "yyyy-MM-dd");
+    const monthStart = startOfMonth(new Date());
+    const endOfRange = today;
+    const endOfRangeStr = format(endOfRange, "yyyy-MM-dd");
+
+    if (isBefore(monthStart, createdAt)) {
+      setFilterStartDate(createdAtStr);
+      setFilterEndDate(endOfRangeStr);
+      setStartDate(createdAtStr);
+      setEndDate(endOfRangeStr);
+      setCurrentMonth(startOfMonth(createdAt));
     }
   }, [employee]);
 
@@ -972,10 +1010,10 @@ export const EmployeeAttendanceDetails = () => {
                     <input
                       type="date"
                       className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                      value={startDate}
+                      value={filterStartDate}
                       min={accountCreatedAtStr}
                       max={todayStr}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => setFilterStartDate(e.target.value)}
                       onClick={(e) => {
                         try {
                           e.currentTarget.showPicker();
@@ -993,10 +1031,10 @@ export const EmployeeAttendanceDetails = () => {
                     <input
                       type="date"
                       className="w-full bg-background border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all text-foreground cursor-pointer [&::-webkit-calendar-picker-indicator]:hidden"
-                      value={endDate}
+                      value={filterEndDate}
                       min={accountCreatedAtStr}
                       max={todayStr}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      onChange={(e) => setFilterEndDate(e.target.value)}
                       onClick={(e) => {
                         try {
                           e.currentTarget.showPicker();
@@ -1012,7 +1050,7 @@ export const EmployeeAttendanceDetails = () => {
                     type="button"
                     className="flex-1 md:flex-none px-6 h-[42px] shadow-sm"
                     onClick={() => {
-                      if (!startDate || !endDate) {
+                      if (!filterStartDate || !filterEndDate) {
                         toast({
                           title: "Warning",
                           description: "Please select both start and end dates.",
@@ -1020,7 +1058,7 @@ export const EmployeeAttendanceDetails = () => {
                         });
                         return;
                       }
-                      if (startDate < accountCreatedAtStr) {
+                      if (filterStartDate < accountCreatedAtStr) {
                         toast({
                           title: "Warning",
                           description: `Start date cannot be before account creation date (${accountCreatedAtStr}).`,
@@ -1028,7 +1066,8 @@ export const EmployeeAttendanceDetails = () => {
                         });
                         return;
                       }
-                      fetchAttendanceAndLeaves();
+                      setStartDate(filterStartDate);
+                      setEndDate(filterEndDate);
                       setCurrentPage(1);
                     }}
                   >
@@ -1039,11 +1078,14 @@ export const EmployeeAttendanceDetails = () => {
                     size="icon"
                     className="h-[42px] w-[42px] border-border hover:bg-muted"
                     onClick={() => {
-                      const thirtyDaysAgo = new Date();
-                      thirtyDaysAgo.setDate(today.getDate() - 30);
-                      const tStr = thirtyDaysAgo < accountCreatedAt ? accountCreatedAtStr : thirtyDaysAgo.toISOString().split("T")[0];
-                      setStartDate(tStr);
-                      setEndDate(todayStr);
+                      const monthStart = startOfMonth(currentMonth);
+                      const monthEnd = isSameMonth(currentMonth, startOfMonth(today)) ? today : endOfMonth(currentMonth);
+                      const monthStartStr = format(monthStart, "yyyy-MM-dd");
+                      const monthEndStr = format(monthEnd, "yyyy-MM-dd");
+                      setFilterStartDate(monthStartStr);
+                      setFilterEndDate(monthEndStr);
+                      setStartDate(monthStartStr);
+                      setEndDate(monthEndStr);
                       setCurrentPage(1);
                     }}
                     title="Reset Filters"
@@ -1056,15 +1098,38 @@ export const EmployeeAttendanceDetails = () => {
           </Card>
 
           <Card className="border shadow-sm bg-card overflow-hidden">
-            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg sm:text-xl">Attendance Details</CardTitle>
-                <CardDescription>
-                  Daily attendance records for the selected date range.
-                </CardDescription>
+            <CardHeader className="pb-3 border-b">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <CardTitle className="text-lg sm:text-xl">Attendance Details</CardTitle>
+                  <CardDescription>
+                    Daily attendance records for the selected date range.
+                  </CardDescription>
+                </div>
+                <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full self-start sm:self-auto">
+                  {formattedAttendanceRows.length} Records
+                </div>
               </div>
-              <div className="text-sm font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                {formattedAttendanceRows.length} Records
+              <div className="mt-4 flex items-center justify-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  onClick={() => applyMonth(addMonths(currentMonth, -1))}
+                  disabled={!employee || !isBefore(startOfMonth(employee.createdAt ? new Date(employee.createdAt) : new Date(0)), currentMonth)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="text-sm font-semibold">{currentMonthLabel}</span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  onClick={() => applyMonth(addMonths(currentMonth, 1))}
+                  disabled={!isBefore(currentMonth, currentMonthStart)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="p-0">
