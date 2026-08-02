@@ -1,23 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useAppSelector } from '@/hooks/useAppSelector';
-import { useAppDispatch } from '@/hooks/useAppDispatch';
-import { updateProfile } from '@/features/auth/store/authSlice';
-import { toast } from '@/hooks/use-toast';
-import { 
-  Save, 
-  Mail, 
-  Phone, 
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useAppSelector } from "@/hooks/useAppSelector";
+import { useAppDispatch } from "@/hooks/useAppDispatch";
+import { updateProfile } from "@/features/auth/store/authSlice";
+import { toast } from "@/hooks/use-toast";
+import {
+  Save,
+  Mail,
+  Phone,
   ShieldCheck,
   CalendarDays,
   Loader2,
   Edit3,
-  Camera
-} from 'lucide-react';
-import { API_BASE_URL } from '@/constants/config';
+  Camera,
+} from "lucide-react";
+import { API_BASE_URL } from "@/constants/config";
 
 interface UserProfile {
   _id: string;
@@ -36,25 +42,25 @@ interface UserProfile {
 }
 
 export const ProfileManagement = () => {
-  const { token } = useAppSelector(state => state.auth);
+  const { token } = useAppSelector((state) => state.auth);
   const dispatch = useAppDispatch();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState<UserProfile | null>(null);
-  
+
   // Image Upload States
   const [uploadingImage, setUploadingImage] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    department: '',
-    phone: '',
-    position: '',
-    dateOfBirth: '',
+    name: "",
+    email: "",
+    department: "",
+    phone: "",
+    position: "",
+    dateOfBirth: "",
   });
 
   const fetchProfile = useCallback(async () => {
@@ -65,7 +71,7 @@ export const ProfileManagement = () => {
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/auth/profile`, {
-        method: 'GET',
+        method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -85,20 +91,24 @@ export const ProfileManagement = () => {
       if (data?.success && data?.data) {
         setProfileData(data.data);
         // Update redux state to sync with sidebar and other components
-        dispatch(updateProfile({
-          profilePicture: data.data.profilePicture,
-          name: data.data.name,
-          email: data.data.email,
-          department: data.data.department,
-          phone: data.data.phone
-        }));
+        dispatch(
+          updateProfile({
+            profilePicture: data.data.profilePicture,
+            name: data.data.name,
+            email: data.data.email,
+            department: data.data.department,
+            phone: data.data.phone,
+          }),
+        );
         setFormData({
-          name: data.data.name || '',
-          email: data.data.email || '',
-          department: data.data.department || '',
-          phone: data.data.phone || '',
-          position: data.data.position || '',
-          dateOfBirth: data.data.dateOfBirth ? new Date(data.data.dateOfBirth).toISOString().split('T')[0] : '',
+          name: data.data.name || "",
+          email: data.data.email || "",
+          department: data.data.department || "",
+          phone: data.data.phone || "",
+          position: data.data.position || "",
+          dateOfBirth: data.data.dateOfBirth
+            ? new Date(data.data.dateOfBirth).toISOString().split("T")[0]
+            : "",
         });
       } else {
         toast({
@@ -139,12 +149,33 @@ export const ProfileManagement = () => {
     fileInputRef.current?.click();
   };
 
+  const getProfileImageSrc = () => {
+    if (previewUrl) return previewUrl;
+    if (!profileData?.profilePicture) return '';
+    if (profileData.profilePicture.startsWith('data:image/')) {
+      return profileData.profilePicture;
+    }
+    return `${API_BASE_URL}/${profileData.profilePicture}`;
+  };
+
+  const readFileAsDataUrl = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Failed to read image'));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     // Validation
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
       toast({
         title: "Invalid file type",
@@ -154,7 +185,8 @@ export const ProfileManagement = () => {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      // 5MB
       toast({
         title: "File too large",
         description: "Image size should be less than 5MB.",
@@ -171,56 +203,56 @@ export const ProfileManagement = () => {
     await handleImageUpload(file);
   };
 
-  const handleImageUpload = async (file: File) => {
-    if (!token) return;
+const handleImageUpload = async (file: File) => {
+  if (!token) return;
 
-    setUploadingImage(true);
-    const formData = new FormData();
-    formData.append('image', file);
+  setUploadingImage(true);
 
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/profile-picture`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
+  try {
+    const base64Image = await readFileAsDataUrl(file);
 
-      const data = await response.json();
+    const response = await fetch(`${API_BASE_URL}/api/auth/profile-picture`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ image: base64Image }),
+    });
 
-      if (data.success) {
-         toast({
-           title: "Success",
-           description: "Profile picture updated successfully",
-         });
-         
-         // Update redux state
-         dispatch(updateProfile({
-           profilePicture: data.data.profilePicture
-         }));
-         
-         // Refresh profile to get the new image URL
-         await fetchProfile();
-         setPreviewUrl(null);
-       } else {
-        throw new Error(data.message || 'Upload failed');
-      }
-    } catch (error: any) {
+    const data = await response.json();
+
+    if (data.success) {
       toast({
-        title: "Upload failed",
-        description: error.message || "An error occurred during upload",
-        variant: "destructive",
+        title: 'Success',
+        description: 'Profile picture updated successfully',
       });
+
+      dispatch(
+        updateProfile({
+          profilePicture: data.data.profilePicture,
+        }),
+      );
+
+      await fetchProfile();
       setPreviewUrl(null);
-    } finally {
-      setUploadingImage(false);
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    } else {
+      throw new Error(data.message || 'Upload failed');
     }
-  };
+  } catch (error: any) {
+    toast({
+      title: 'Upload failed',
+      description: error.message || 'An error occurred during upload',
+      variant: 'destructive',
+    });
+    setPreviewUrl(null);
+  } finally {
+    setUploadingImage(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -257,7 +289,8 @@ export const ProfileManagement = () => {
       if (!response.ok) {
         toast({
           title: "Update failed",
-          description: data?.message || "Unable to update profile. Please try again.",
+          description:
+            data?.message || "Unable to update profile. Please try again.",
           variant: "destructive",
         });
         setSaving(false);
@@ -271,9 +304,9 @@ export const ProfileManagement = () => {
             email: data.data.email,
             department: data.data.department,
             phone: data.data.phone,
-          })
+          }),
         );
-        
+
         setIsEditing(false);
         setSaving(false);
 
@@ -292,7 +325,7 @@ export const ProfileManagement = () => {
         setSaving(false);
       }
     } catch (error) {
-      console.error('Profile update error:', error);
+      console.error("Profile update error:", error);
       toast({
         title: "Update failed",
         description: "An error occurred while updating your profile",
@@ -305,12 +338,14 @@ export const ProfileManagement = () => {
   const handleCancel = () => {
     if (profileData) {
       setFormData({
-        name: profileData.name || '',
-        email: profileData.email || '',
-        department: profileData.department || '',
-        phone: profileData.phone || '',
-        position: profileData.position || '',
-        dateOfBirth: profileData.dateOfBirth ? new Date(profileData.dateOfBirth).toISOString().split('T')[0] : '',
+        name: profileData.name || "",
+        email: profileData.email || "",
+        department: profileData.department || "",
+        phone: profileData.phone || "",
+        position: profileData.position || "",
+        dateOfBirth: profileData.dateOfBirth
+          ? new Date(profileData.dateOfBirth).toISOString().split("T")[0]
+          : "",
       });
     }
     setIsEditing(false);
@@ -331,7 +366,9 @@ export const ProfileManagement = () => {
     return (
       <div className="w-full min-h-full bg-background">
         <div className="p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center gap-4">
-          <div className="text-muted-foreground text-lg">Unable to load profile</div>
+          <div className="text-muted-foreground text-lg">
+            Unable to load profile
+          </div>
           <Button variant="outline" onClick={fetchProfile}>
             Try Again
           </Button>
@@ -340,7 +377,9 @@ export const ProfileManagement = () => {
     );
   }
 
-  const firstInitial = profileData.name ? profileData.name.charAt(0).toUpperCase() : '?';
+  const firstInitial = profileData.name
+    ? profileData.name.charAt(0).toUpperCase()
+    : "?";
 
   return (
     <div className="w-full min-h-full bg-background pb-10">
@@ -349,7 +388,9 @@ export const ProfileManagement = () => {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">My Profile</h2>
-            <p className="text-muted-foreground mt-1">View and manage your personal information</p>
+            <p className="text-muted-foreground mt-1">
+              View and manage your personal information
+            </p>
           </div>
         </div>
 
@@ -359,7 +400,7 @@ export const ProfileManagement = () => {
             <Card>
               <CardContent className="pt-6 space-y-6">
                 <div className="flex flex-col items-center text-center pb-6 border-b">
-                  <div 
+                  <div
                     className="relative group cursor-pointer"
                     onClick={handleImageClick}
                   >
@@ -369,17 +410,19 @@ export const ProfileManagement = () => {
                           <Loader2 className="h-8 w-8 animate-spin text-white" />
                         </div>
                       ) : null}
-                      
+
                       {previewUrl || profileData.profilePicture ? (
-                        <img 
-                          src={previewUrl || `${API_BASE_URL}/${profileData.profilePicture}`} 
-                          alt="Profile" 
+                        <img
+                          src={getProfileImageSrc()}
+                          alt="Profile"
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <span className="text-4xl font-bold text-primary">{firstInitial}</span>
+                        <span className="text-4xl font-bold text-primary">
+                          {firstInitial}
+                        </span>
                       )}
-                      
+
                       {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                         <Camera className="h-8 w-8 text-white" />
@@ -392,7 +435,7 @@ export const ProfileManagement = () => {
                     </div>
                   </div>
 
-                  <input 
+                  <input
                     type="file"
                     ref={fileInputRef}
                     className="hidden"
@@ -402,7 +445,11 @@ export const ProfileManagement = () => {
                   />
 
                   <h3 className="font-bold text-lg mt-2">{profileData.name}</h3>
-                  <p className="text-sm text-muted-foreground">{profileData.position || profileData.employeeId || "Staff Member"}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {profileData.position ||
+                      profileData.employeeId ||
+                      "Staff Member"}
+                  </p>
                 </div>
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
@@ -410,8 +457,12 @@ export const ProfileManagement = () => {
                       <Mail className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Email Address</p>
-                      <p className="text-sm font-medium truncate">{profileData.email}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                        Email Address
+                      </p>
+                      <p className="text-sm font-medium truncate">
+                        {profileData.email}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -419,8 +470,12 @@ export const ProfileManagement = () => {
                       <Phone className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Phone Number</p>
-                      <p className="text-sm font-medium">{profileData.phone || "Not provided"}</p>
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">
+                        Phone Number
+                      </p>
+                      <p className="text-sm font-medium">
+                        {profileData.phone || "Not provided"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -433,24 +488,32 @@ export const ProfileManagement = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Personal Information</CardTitle>
-                <CardDescription>Update your personal and employment details</CardDescription>
+                <CardDescription>
+                  Update your personal and employment details
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
+                      <Label htmlFor="name" className="text-sm font-medium">
+                        Full Name
+                      </Label>
                       <Input
                         id="name"
                         value={formData.name}
-                        onChange={(e) => setFormData({...formData, name: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
                         className="w-full"
                         disabled={!isEditing}
                         required
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+                      <Label htmlFor="email" className="text-sm font-medium">
+                        Email
+                      </Label>
                       <Input
                         id="email"
                         type="email"
@@ -460,24 +523,38 @@ export const ProfileManagement = () => {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="department" className="text-sm font-medium">Department</Label>
+                      <Label
+                        htmlFor="department"
+                        className="text-sm font-medium"
+                      >
+                        Department
+                      </Label>
                       <Input
                         id="department"
                         value={formData.department}
-                        onChange={(e) => setFormData({...formData, department: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            department: e.target.value,
+                          })
+                        }
                         className="w-full"
                         disabled={!isEditing}
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="position" className="text-sm font-medium">Position</Label>
+                      <Label htmlFor="position" className="text-sm font-medium">
+                        Position
+                      </Label>
                       <Input
                         id="position"
                         value={formData.position}
-                        onChange={(e) => setFormData({...formData, position: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, position: e.target.value })
+                        }
                         className="w-full"
                         disabled={!isEditing}
                       />
@@ -486,22 +563,36 @@ export const ProfileManagement = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
+                      <Label htmlFor="phone" className="text-sm font-medium">
+                        Phone
+                      </Label>
                       <Input
                         id="phone"
                         value={formData.phone}
-                        onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({ ...formData, phone: e.target.value })
+                        }
                         className="w-full"
                         disabled={!isEditing}
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="dateOfBirth" className="text-sm font-medium">Date of Birth</Label>
+                      <Label
+                        htmlFor="dateOfBirth"
+                        className="text-sm font-medium"
+                      >
+                        Date of Birth
+                      </Label>
                       <Input
                         id="dateOfBirth"
                         type="date"
                         value={formData.dateOfBirth}
-                        onChange={(e) => setFormData({...formData, dateOfBirth: e.target.value})}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            dateOfBirth: e.target.value,
+                          })
+                        }
                         className="w-full"
                         disabled={!isEditing}
                       />
@@ -510,28 +601,40 @@ export const ProfileManagement = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="grid gap-2">
-                      <Label htmlFor="employeeId" className="text-sm font-medium">Employee ID</Label>
-                      <Input 
-                        id="employeeId" 
-                        value={profileData.employeeId || 'Not Assigned'} 
-                        disabled 
-                        className="w-full bg-muted" 
+                      <Label
+                        htmlFor="employeeId"
+                        className="text-sm font-medium"
+                      >
+                        Employee ID
+                      </Label>
+                      <Input
+                        id="employeeId"
+                        value={profileData.employeeId || "Not Assigned"}
+                        disabled
+                        className="w-full bg-muted"
                       />
                     </div>
                     <div className="grid gap-2">
-                      <Label htmlFor="role" className="text-sm font-medium">Role</Label>
-                      <Input 
-                        id="role" 
-                        value={profileData.role ? profileData.role.charAt(0).toUpperCase() + profileData.role.slice(1) : ''} 
-                        disabled 
-                        className="w-full bg-muted" 
+                      <Label htmlFor="role" className="text-sm font-medium">
+                        Role
+                      </Label>
+                      <Input
+                        id="role"
+                        value={
+                          profileData.role
+                            ? profileData.role.charAt(0).toUpperCase() +
+                              profileData.role.slice(1)
+                            : ""
+                        }
+                        disabled
+                        className="w-full bg-muted"
                       />
                     </div>
                   </div>
-                  
+
                   <div className="flex flex-col sm:flex-row gap-3 pt-4">
                     {!isEditing ? (
-                      <Button 
+                      <Button
                         type="button"
                         onClick={(e) => {
                           e.preventDefault();
@@ -545,8 +648,8 @@ export const ProfileManagement = () => {
                       </Button>
                     ) : (
                       <>
-                        <Button 
-                          type="submit" 
+                        <Button
+                          type="submit"
                           className="w-full sm:w-auto"
                           disabled={saving}
                         >
@@ -562,7 +665,7 @@ export const ProfileManagement = () => {
                             </>
                           )}
                         </Button>
-                        <Button 
+                        <Button
                           type="button"
                           variant="outline"
                           onClick={(e) => {
@@ -586,7 +689,9 @@ export const ProfileManagement = () => {
             <Card className="mt-6">
               <CardHeader>
                 <CardTitle className="text-lg">Account Information</CardTitle>
-                <CardDescription>System-managed account details</CardDescription>
+                <CardDescription>
+                  System-managed account details
+                </CardDescription>
               </CardHeader>
               <CardContent className="grid gap-6 sm:grid-cols-2">
                 <div className="flex items-start gap-3 p-4 rounded-xl border bg-card hover:bg-muted/20 transition-colors">
@@ -594,13 +699,20 @@ export const ProfileManagement = () => {
                     <CalendarDays className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Joining Date</p>
+                    <p className="text-sm text-muted-foreground">
+                      Joining Date
+                    </p>
                     <p className="font-bold text-base">
-                      {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString('en-GB', { 
-                        day: '2-digit', 
-                        month: 'short', 
-                        year: 'numeric' 
-                      }) : "-"}
+                      {profileData.createdAt
+                        ? new Date(profileData.createdAt).toLocaleDateString(
+                            "en-GB",
+                            {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            },
+                          )
+                        : "-"}
                     </p>
                   </div>
                 </div>
@@ -610,7 +722,9 @@ export const ProfileManagement = () => {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Account Status</p>
+                    <p className="text-sm text-muted-foreground">
+                      Account Status
+                    </p>
                     <p className="font-bold text-base">
                       {profileData.isActive ? "Active" : "Inactive"}
                     </p>
@@ -623,15 +737,20 @@ export const ProfileManagement = () => {
                       <CalendarDays className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">Last Login</p>
+                      <p className="text-sm text-muted-foreground">
+                        Last Login
+                      </p>
                       <p className="font-bold text-base">
-                        {new Date(profileData.lastLoginAt).toLocaleDateString('en-GB', { 
-                          day: '2-digit', 
-                          month: 'short', 
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        {new Date(profileData.lastLoginAt).toLocaleDateString(
+                          "en-GB",
+                          {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </p>
                     </div>
                   </div>

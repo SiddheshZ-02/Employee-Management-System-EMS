@@ -42,23 +42,21 @@ export const ForgotPasswordPage = () => {
         return;
       }
 
-      const token = data?.resetToken || data?.token || '';
-      const exists = typeof data?.exists === 'boolean' ? data.exists : !!token;
-      if (!exists) {
-        toast({ title: 'Email address not found', description: 'Please check and try again', variant: 'destructive' });
-        setEmail('');
+      const token = data?.resetToken as string | undefined;
+
+      if (!token) {
+        toast({ title: 'Request failed', description: 'Reset token missing. Please try again.', variant: 'destructive' });
         return;
       }
 
-      sessionStorage.setItem('resetEmail', email);
-      if (token) {
-        sessionStorage.setItem('resetToken', token);
-        navigate(`/auth/reset-password?token=${encodeURIComponent(token)}`);
-      } else {
-        navigate('/auth/reset-password');
-      }
+      toast({
+        title: 'Email verified',
+        description: 'Please reset your password on the next page.',
+      });
 
-      toast({ title: 'Email sent', description: 'Reset instructions have been sent if the email exists' });
+      sessionStorage.setItem('resetEmail', email);
+      sessionStorage.setItem('resetToken', token);
+      navigate(`/auth/reset-password?token=${encodeURIComponent(token)}`);
     } catch {
       toast({ title: 'Request failed', description: 'Network or server error', variant: 'destructive' });
     } finally {

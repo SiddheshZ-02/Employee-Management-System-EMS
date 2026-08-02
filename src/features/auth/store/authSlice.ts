@@ -197,21 +197,19 @@ export const loginAsync =
     dispatch(loginStart());
     try {
       const apiUser = await loginRequest(email, password);
-      if (!apiUser) {
-        dispatch(loginFailure());
-        return;
-      }
       const user = mapApiUserToUser(apiUser);
       dispatch(
         loginSuccess({
           user,
           token: apiUser.token,
           refreshToken: apiUser.refreshToken,
-        })
+        }),
       );
-    } catch (error) {
+      return true;
+    } catch (error: any) {
       console.error("Authentication error:", error);
       dispatch(loginFailure());
+      throw error;
     }
   };
 

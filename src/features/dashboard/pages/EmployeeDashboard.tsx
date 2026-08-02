@@ -28,6 +28,7 @@ import {
   ShieldAlert,
   LogIn,
   LogOut,
+  ChevronDown,
 } from "lucide-react";
 import { API_BASE_URL } from "@/constants/config";
 import { UpcomingHolidaysWidget } from "@/features/holidays/components/UpcomingHolidaysWidget";
@@ -95,7 +96,11 @@ export const EmployeeDashboard = () => {
   const [attendanceStatus, setAttendanceStatus] =
     useState<AttendanceStatus>("idle");
   const [todayAttendance, setTodayAttendance] = useState<any | null>(null);
-  const [selectedWorkMode, setSelectedWorkMode] = useState<WorkMode>("Office");
+
+  // No mode pre-selected — user must explicitly choose Office or WFH.
+  const [selectedWorkMode, setSelectedWorkMode] = useState<WorkMode | null>(
+    null,
+  );
   const [isSubmittingAttendance, setIsSubmittingAttendance] = useState(false);
   const [leaveBalance, setLeaveBalance] = useState(0);
   const [monthAttendance, setMonthAttendance] = useState<{
@@ -409,12 +414,18 @@ export const EmployeeDashboard = () => {
       return;
     }
 
+    const isCheckingOut = attendanceStatus === "checked-in";
+
+    if (!isCheckingOut && !selectedWorkMode) {
+      toast.error("Please select a work mode (Office or WFH) first.");
+      return;
+    }
+
     setIsSubmittingAttendance(true);
 
     try {
       const location = await getCurrentLocation();
       setLocationPermission("granted");
-      const isCheckingOut = attendanceStatus === "checked-in";
       const endpoint = isCheckingOut ? "checkout" : "checkin";
       const payload: Record<string, unknown> = {
         latitude: location.latitude,
@@ -451,9 +462,16 @@ export const EmployeeDashboard = () => {
           ? "checked-out"
           : "checked-in",
       );
-      setSelectedWorkMode(
-        (data.attendance?.workMode as WorkMode) || selectedWorkMode,
-      );
+
+      if (isCheckingOut) {
+        // Force the user to explicitly choose a mode again next time.
+        setSelectedWorkMode(null);
+      } else {
+        setSelectedWorkMode(
+          (data.attendance?.workMode as WorkMode) || selectedWorkMode,
+        );
+      }
+
       setHoursToday(data.stats?.totalHours || "0h 0m");
       toast.success(data.message || "Attendance updated successfully.");
     } catch (error: any) {
@@ -608,7 +626,10 @@ export const EmployeeDashboard = () => {
             } else {
               setAttendanceStatus("idle");
             }
-            if (todayJson.attendance?.workMode) {
+            if (
+              todayJson.attendance?.workMode &&
+              todayJson.attendance?.status === "checked-in"
+            ) {
               setSelectedWorkMode(
                 todayJson.attendance.workMode === "WFH" ? "WFH" : "Office",
               );
@@ -758,7 +779,7 @@ export const EmployeeDashboard = () => {
             } else {
               setAttendanceStatus("idle");
             }
-            if (data.attendance?.workMode) {
+            if (data.attendance?.workMode && data.attendance?.status === "checked-in") {
               setSelectedWorkMode(
                 data.attendance.workMode === "WFH" ? "WFH" : "Office",
               );
@@ -1074,36 +1095,60 @@ export const EmployeeDashboard = () => {
                 }
                 aria-hidden={!isLocationGranted}
               >
-                <div className="flex rounded-lg bg-muted p-1 text-sm max-w-xs">
-                  {(["Office", "WFH"] as WorkMode[]).map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setSelectedWorkMode(m)}
+                {/* Work mode dropdown */}
+                <div className="max-w-1/6">
+                  <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
+                    Work mode
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={selectedWorkMode ?? ""}
+                      onChange={(e) =>
+                        setSelectedWorkMode(
+                          e.target.value ? (e.target.value as WorkMode) : null,
+                        )
+                      }
                       disabled={
                         isSubmittingAttendance ||
                         attendanceStatus === "checked-in"
                       }
                       className={
-                        "flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 transition-colors " +
-                        (selectedWorkMode === m
-                          ? "bg-background shadow-sm font-medium"
-                          : "text-muted-foreground")
+                        "w-full appearance-none rounded-lg border bg-background px-3 py-2 pr-9 text-sm font-medium " +
+                        "focus:outline-none focus:ring-2 focus:ring-primary/40 disabled:opacity-60 disabled:cursor-not-allowed " +
+                        (selectedWorkMode
+                          ? "border-border"
+                          : "border-dashed border-muted-foreground/40 text-muted-foreground")
                       }
                     >
-                      {m === "Office" ? (
-                        <Building2 className="h-3.5 w-3.5" />
-                      ) : (
-                        <Home className="h-3.5 w-3.5" />
+                      <option value="" disabled>
+                        Select mode…
+                      </option>
+                      <option value="Office">Office</option>
+                      <option value="WFH">WFH</option>
+                    </select>
+                    <div className="pointer-events-none absolute inset-y-0 right-2 flex items-center gap-1">
+                      {selectedWorkMode === "Office" && (
+                        <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                       )}
-                      {m === "Office" ? "Office" : "WFH"}
-                    </button>
-                  ))}
+                      {selectedWorkMode === "WFH" && (
+                        <Home className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                      <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                    </div>
+                  </div>
+                  {!selectedWorkMode && attendanceStatus !== "checked-in" && (
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Choose a mode to enable check-in.
+                    </p>
+                  )}
                 </div>
 
                 <Button
                   onClick={handleAttendanceAction}
-                  disabled={isSubmittingAttendance}
+                  disabled={
+                    isSubmittingAttendance ||
+                    (attendanceStatus !== "checked-in" && !selectedWorkMode)
+                  }
                   className={
                     "w-full sm:w-auto gap-2 " +
                     (attendanceStatus === "checked-in"
@@ -1126,6 +1171,7 @@ export const EmployeeDashboard = () => {
                       ? "Check out"
                       : "Check in"}
                 </Button>
+
                 {isLocationGranted &&
                   selectedWorkMode === "Office" &&
                   nearestOffice && (

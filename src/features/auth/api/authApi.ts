@@ -41,10 +41,22 @@ export async function loginRequest(email: string, password: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!response.ok) return null;
-  const data = (await response.json()) as LoginResponse;
-  if (!data?.success || !data?.data) return null;
-  return data.data;
+
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error("Wrong email or password");
+    }
+    const errorMessage = body?.message || "Server error. Please try again later.";
+    throw new Error(errorMessage);
+  }
+
+  if (!body?.success || !body?.data) {
+    throw new Error("Unable to log in. Please try again.");
+  }
+
+  return body.data;
 }
 
 export async function logoutRequest(token: string) {

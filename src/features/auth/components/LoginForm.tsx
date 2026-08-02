@@ -8,7 +8,7 @@ import { useAppDispatch } from '@/hooks/useAppDispatch';
 import { useAppSelector } from '@/hooks/useAppSelector';
 import { loginAsync } from '@/features/auth/store/authSlice';
 import { store } from '@/app/store';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 // interface LoginFormProps {
@@ -28,47 +28,28 @@ export const LoginForm = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttemptedLogin(true);
-    
+
     if (!email || !password) {
-      toast({
-        title: "Error",
-        description: "Please fill in all fields",
-        variant: "destructive"
-      });
+      toast.error("Please fill in all fields");
       return;
     }
 
     try {
       await dispatch(loginAsync(email, password));
-      
-      // Check if login was successful
       const authState = store.getState().auth;
+
       if (authState.isAuthenticated) {
-        toast({
-          title: "Welcome back!",
-          description: `Successfully logged in as ${authState.user?.role}`,
-        });
-        
-        if (authState.user?.role === 'Admin') {
-          navigate('/admin/dashboard');
-        } else if (authState.user?.role === 'Owner') {
-          navigate('/owner/dashboard');
-        } else {
-          navigate('/employee/dashboard');
-        }
-      } else {
-        toast({
-          title: "Invalid credentials",
-          description: "Please check your email and password",
-          variant: "destructive"
-        });
+        navigate(
+          authState.user?.role === "Admin"
+            ? "/admin/dashboard"
+            : authState.user?.role === "Owner"
+            ? "/owner/dashboard"
+            : "/employee/dashboard"
+        );
+        toast.success("Welcome back!");
       }
-    } catch {
-      toast({
-        title: "Login failed",
-        description: "An error occurred during login",
-        variant: "destructive"
-      });
+    } catch (error: any) {
+      toast.error(error?.message || "Invalid credentials or server error");
     }
   };
 
